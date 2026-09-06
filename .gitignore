@@ -9,6 +9,7 @@ TODO.md
 # Nel repo viaggiano solo i template *.example.yaml.
 config/*.yaml
 !config/*.example.yaml
+!config/*.example.it.yaml
 config/secrets.env
 config/.vault_pass
 config/*.bak
