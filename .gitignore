@@ -1,0 +1,61 @@
+# ── Documenti interni: NON fanno parte della distribuzione ─────────
+# Roadmap di lavoro, istruzioni per Claude e skill restano sul disco del
+# maintainer. Il repo pubblico espone solo README, LICENSE e CHANGELOG.
+CLAUDE.md
+TODO.md
+.claude/
+
+# ── Configurazione reale con credenziali (NON committare) ──────────
+# Nel repo viaggiano solo i template *.example.yaml.
+config/*.yaml
+!config/*.example.yaml
+config/secrets.env
+config/.vault_pass
+config/*.bak
+config/*.bak.yaml
+# Storico delle serie temporali (dati reali della rete).
+# WAL crea anche history.db-wal e history.db-shm accanto al file.
+config/history.db*
+config/audit.log
+
+# ── Dati reali della rete di chi installa ──────────────────────────
+device_inventory*.xlsx
+*.xlsx
+# Report di sicurezza: descrivono una rete vera (IP, MAC, firewall).
+security/
+
+# ── Segreti / chiavi ───────────────────────────────────────────────
+ssh/
+*.pem
+*.key
+certs/
+*.env
+.env
+
+# ── Python ─────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.coverage
+htmlcov/
+.venv/
+venv/
+.pytest_cache/
+
+# ── Runtime / log ──────────────────────────────────────────────────
+logs/
+*.log
+
+# ── Artefatti di export immagini Docker ────────────────────────────
+dist/
+*.tar.gz
+
+# ── Mockup di design (non fa parte del servizio) ───────────────────
+claude-design/
+
+# ── OS / editor ────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
