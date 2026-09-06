@@ -1,0 +1,422 @@
+# ═══════════════════════════════════════════════════════════════════
+#  config.example.yaml — LANMng configuration
+#
+#  HOW TO USE IT:
+#    1. Copy this file:   cp config/config.example.yaml config/config.yaml
+#    2. Fill in the fields with YOUR OWN values
+#    3. config.yaml is NOT committed to git (it is in .gitignore)
+#
+#  Every value can also be overridden by an environment variable with the
+#  LAN_ prefix (e.g. LAN_ROUTER__PASSWORD=...). Nested sections use a
+#  double underscore "__".
+#
+#  The addresses in this file are documentation ranges (RFC 5737:
+#  192.0.2.0/24, 198.51.100.0/24, 203.0.113.0/24). They are deliberately
+#  NOT real: replace them with your own, or nothing will be found.
+#
+#  An Italian copy of this file is available as config.example.it.yaml.
+# ═══════════════════════════════════════════════════════════════════
+
+# ── Logging ────────────────────────────────────────────────────────
+# debug: true -> more verbose logs (DEBUG). Data is ALWAYS real: no mocks.
+debug: false
+
+# ── Router (OpenWrt) ──────────────────────────────────────────────
+router:
+  host: "192.0.2.1"
+  port: 22
+  user: "root"
+  # SSH authentication: you can set both (the key is preferred, the password
+  # is the fallback). Prefer the key in production.
+  # password: "CHANGE_ROUTER_PASSWORD"   # or set it from the UI (secrets)
+  ssh_key: "/app/ssh/id_ed25519"
+  # Uplink (WAN) interface for the traffic chart. If empty, the
+  # wan_candidates list is tried. On routers with USB tethering it is
+  # often "tethering".
+  wan_interface: ""
+  wan_candidates: ["wan", "wan6", "usb0", "wwan", "tethering"]
+  # Host used for internet connectivity/latency probes from the router.
+  internet_probe: "8.8.8.8"
+  # Wireless device used to list associated clients (iwinfo).
+  wireless_device: "wlan0"
+  # The luci_* fields are NO LONGER needed: the router is queried over
+  # SSH+ubus only (LuCI-RPC over HTTP is not installed). Kept for
+  # backward compatibility.
+
+# ── Docker (multi-host) ───────────────────────────────────────────
+#  Monitors containers on SEVERAL hosts. The local one (where the backend
+#  runs) uses the socket; the others over SSH (recommended: no Docker port
+#  exposed) or over TCP.
+docker:
+  # Local host (where LANMng runs):
+  local_enabled: true
+  socket: "/var/run/docker.sock"
+  local_name: "homeserver"
+
+  # Also query over SSH the hosts listed in discovery.ssh.hosts where
+  # Docker is present (auto-discovery):
+  autodiscover: true
+
+  # Explicit remote Docker hosts (in addition to auto-discovery):
+  hosts: []
+    # - name: "workstation"
+    #   method: "ssh"            # ssh | tcp
+    #   host: "192.0.2.10"
+    #   user: "user"
+    #   key: "/app/ssh/id_ed25519"
+    # - name: "nas"
+    #   method: "tcp"            # Docker API on tcp://host:port (trusted network only)
+    #   host: "198.51.100.40"
+    #   port: 2375
+
+# ── WireGuard ─────────────────────────────────────────────────────
+wireguard:
+  interface: "wgclient"
+  config_file: "/etc/wireguard/wgclient.conf"
+  # Endpoint of the tunnel that must ALWAYS be up. This is not just a
+  # label: the `wireguard.relay_giu` alert rule uses it to know which peer
+  # to watch (critical if it does not handshake for 5 minutes). Leave it
+  # empty if you have no always-on tunnel: the rule then does not run.
+  relay_host: "203.0.113.10"
+  # Mapping pubkey -> readable name (optional but recommended)
+  peer_names:
+    "PUBKEY_WORKSTATION==": "workstation"
+    "PUBKEY_HOMESERVER==":  "homeserver"
+    "PUBKEY_DESKTOP==":     "desktop"
+    "PUBKEY_LAPTOP==":      "laptop"
+
+# ── Network tools (Tools page) ────────────────────────────────────
+tools:
+  # Where to download from to measure line speed. It must answer with a
+  # stream of bytes: `{bytes}` is replaced with the requested amount. It is
+  # in the configuration and not in the code because it is a choice
+  # (whoever hosts it sees your address).
+  speedtest_url: "https://speed.cloudflare.com/__down?bytes={bytes}"
+  speedtest_mb: 5            # how much to download by default
+  speedtest_max_mb: 50       # cap: on a metered WAN the measurement costs money
+  # Registry the whois starts from: the referral to the right one is followed.
+  whois_server: "whois.iana.org"
+
+# ── Authentication (single admin login) ───────────────────────────
+#  method "basic" enables the login. The password is set from the UI
+#  (Settings -> Admin password): it is stored as a bcrypt hash in the
+#  secrets file (secrets.env), NEVER in clear text here.
+auth:
+  method: "basic"            # none | basic
+  # Skip the login for requests coming from a private address. Note the
+  # scope: this trusts EVERY private range plus loopback, not just your own
+  # subnet - and a "LAN" includes segmented subnets, guest wifi and VPN
+  # clients. Keep it false if you have guests or untrusted devices;
+  # MANDATORY false if the backend sits behind a reverse proxy (the address
+  # seen would be the proxy's).
+  bypass_lan: false
+  username: "admin"
+  # password_hash: do NOT put it here -> set it from the UI (it goes to the secrets).
+
+# ── CORS: who may call the API from another site ──────────────────
+#  Empty (the default) = nobody. The dashboard and the API live on the same
+#  host, so its requests are same-origin and do not go through CORS: with
+#  the list empty, no other site can call the API with your credentials.
+#  Fill it in only if you genuinely need an external client.
+cors:
+  allowed_origins: []
+    # - "http://otherhost:3000"
+
+# ── SSH terminal from the dashboard ───────────────────────────────
+#  Reachable hosts are NOT listed here: they are the ones already known
+#  (router + discovery.ssh.hosts + systemd host). This way there is no way
+#  to make the backend open a session towards an arbitrary machine.
+#  The page ALWAYS requires the admin login, even with auth.method: none.
+terminal:
+  enabled: true
+  term_type: "xterm-256color"
+  idle_timeout: 900         # seconds of inactivity before the session closes
+  max_sessions: 3           # concurrent sessions
+  # Records typed commands in config/audit.log. The heuristic skips lines
+  # typed after a password prompt, but it is not infallible: if you type
+  # secrets at non-standard prompts, set this to false.
+  audit_commands: true
+
+# ── Host systemd service status ───────────────────────────────────
+#  There is no systemctl inside the container: to read the HOST's systemd
+#  the backend runs the command over SSH towards the host itself (reusing
+#  the key mounted in /app/ssh). The key must be authorized for ssh_user
+#  on the host.
+systemd:
+  ssh_enabled: true            # false -> local systemctl (only if running on the host)
+  ssh_host: "127.0.0.1"
+  ssh_port: 22
+  ssh_user: "user"             # a user with access to `systemctl show`
+  ssh_key: "/app/ssh/id_ed25519"
+
+# ── Host resources (CPU, RAM, disks, temperatures) ────────────────
+#  Read over SSH, like systemd and Docker: no agent to install.
+#  Hosts and credentials are the ones in discovery.ssh (below): here you
+#  only decide WHICH ones to query and HOW OFTEN.
+#
+#  It also works with Windows hosts (via PowerShell), with two differences
+#  that come from the operating system and not from LANMng: load average
+#  does not exist and the card shows a dash, and temperatures are readable
+#  only if the SSH user is an administrator - otherwise the temperature
+#  section simply does not appear.
+host_metrics:
+  enabled: true
+  # Empty = every host in discovery.ssh.hosts, but **only if SSH discovery
+  # is on**. Listing addresses here is the way to read resources while
+  # keeping discovery off: e.g. ["198.51.100.10", "192.0.2.12"].
+  hosts: []
+  # Seconds between two collections. It is also the window the CPU is
+  # averaged over: the percentage is the difference between two readings of
+  # /proc/stat, not an instantaneous sample, so it does not depend on when
+  # it was taken. The first reading has no value (a gap in the chart), from
+  # the second one on it does.
+  interval: 60
+  skip_offline: true      # do not try to connect to hosts seen as down
+  top_processes: 6        # how many heaviest processes to show per host
+  history_points: 60      # history points kept per host (60 x 60s = 1 hour)
+  command_timeout: 15     # cap on the remote command execution
+
+# ── Chart history ─────────────────────────────────────────────────
+#  Without history every container restart clears the charts: traffic and
+#  resources live in memory only. With this section enabled the history
+#  goes into an SQLite database inside this very directory
+#  (config/history.db), which is the only writable one in the container and
+#  the only one updates never touch - so it survives restarts.
+#
+#  To keep the file from growing without bound, old points are not deleted
+#  right away: they are aggregated. Full detail for the last `full_hours`,
+#  then averages `bucket_seconds` wide, and everything past `retain_days`
+#  is dropped. With the default values the file stays in the order of a few MB.
+history:
+  enabled: true
+  retain_days: 7            # how many days of history to keep
+  full_hours: 24            # past these hours points become averages
+  bucket_seconds: 300       # width of the average (300 = 5 minutes)
+  compact_every_minutes: 60 # how often compaction runs
+  # Cap on the points returned by a single request: a chart does not draw
+  # more than this and the query stays fast.
+  max_points: 1500
+
+# ── Logs page ─────────────────────────────────────────────────────
+#  Four sources, and they do not cost the same.
+#
+#  The ROUTER syslog is read on demand and is NEVER archived: that machine
+#  has few resources and already keeps its own buffer.
+#  The BACKEND logs live only in memory and in `docker logs`, which
+#  disappears with the image: they are the only thing genuinely lost, and
+#  they are archived.
+#  The AUDIT trail stays the append-only file it has always been
+#  (config/audit.log, mode 600); the copy in the database only exists to
+#  search it from the page, and the file stays complete even when the copy
+#  expires.
+#  JOURNALCTL is read over SSH from the hosts: systemd keeps it, not LANMng.
+#
+#  The archive uses the same file as the history (config/history.db).
+logs:
+  buffer_lines: 2000        # backend log lines kept in memory
+  max_lines: 5000           # cap on lines per single request
+  # How often, in seconds, "follow in real time" re-polls the sources that
+  # cannot notify (router and journalctl). Lowering it means more work for
+  # the router: there is a minimum on purpose.
+  tail_interval: 10
+  tail_interval_min: 5
+  tail_max_seconds: 3600    # after this the stream closes saying so (and the page reopens it)
+  persist: true             # archive backend and audit (never the router log)
+  retain_days: 7            # how long backend lines are kept
+  # Cap on archived backend lines: whichever limit hits first between this
+  # and retain_days wins. It exists because retention by days does NOT
+  # bound a log whose rate you do not control - measured on a real
+  # instance, seven days were worth 46 MB against the ~5 of the time
+  # series history. 50,000 lines are roughly 6 MB. The audit trail has no
+  # cap: it is a few lines a day.
+  max_rows: 50000
+  audit_retain_days: 90     # the audit is kept longer: suspicion comes later
+  audit_enabled: true       # show the audit trail in the page
+  # Hosts to offer journalctl for. Empty = the default systemd host (the
+  # one hosting LANMng) plus those in `discovery.ssh`. Reading the system
+  # journal requires the SSH user to be in the `systemd-journal` group (or
+  # be root): if it is not, the page says so instead of showing a blank.
+  journal_hosts: []
+  # Lines NOT to keep. A discarded line does not enter the buffer, so it
+  # does not reach the archive, and it does not appear in the page - not
+  # even if it had already been archived before the rule existed. It does
+  # stay in `docker logs`, which is another channel: you stop keeping the
+  # noise, not producing it.
+  #
+  # `pattern` (text searched in the message) and `src` (who wrote the line)
+  # apply as AND; a rule with neither is ignored, so a field left empty by
+  # mistake does not empty the Logs page.
+  # The audit trail is NEVER filterable: it is the trace you go and read
+  # when something has gone wrong.
+  # Changes require a service restart (button in Settings).
+  exclude: []
+  # Example:
+  # exclude:
+  #   - pattern: "HTTP Request"      # text searched in the message
+  #     src: "httpx"                 # optional: only lines from this logger
+  #     note: "one line per Docker API call"
+  #   - pattern: "Child connection"
+  #     sources: [router]            # empty = all ("journal" = every host)
+  #     note: "connections opened by the monitoring itself"
+  #   - pattern: "192\\.0\\.2\\.\\d+: timeout"
+  #     regex: true                  # without this the pattern is plain text
+  #     enabled: false               # turns it off without deleting it
+
+# ── Contextual alerts ─────────────────────────────────────────────
+#  Every alert appears in the page that owns the object (Docker in
+#  Monitoring, interfaces in Host, peers in WireGuard): there is no "Alerts"
+#  tab. The full list of rules is in Settings.
+#
+#  `silenced` is the only section the service re-reads on its own, without a
+#  restart: silencing a warning from the UI takes effect within one cycle
+#  (10 seconds).
+alerts:
+  enabled: true
+  min_seconds: 120           # default wait before a fault sounds
+  source_critical_after: 3   # consecutive failures before a source is critical
+
+  # Per-rule overrides (all fields optional).
+  #  enabled: false   -> the rule does not run at all
+  #  level: info      -> lowers the level (critical | warn | info)
+  #  min_seconds: 300 -> how long the fault must last before sounding
+  rules: {}
+  #  wireguard.peer_mai_connesso:
+  #    enabled: true          # off by default: an idle peer is normal
+  #  wireguard.relay_giu:
+  #    min_seconds: 600       # how long the relay tunnel may stay down
+  #    level: warn            #   before sounding (default 300s, critical)
+
+  # Warnings silenced forever, with the reason written down (mandatory: in
+  # six months it must be clear why that warning no longer sounds). An empty
+  # `subject` silences the whole rule. Managed from Settings -> Silenced alerts.
+  silenced: []
+  #  - rule: host.subnet_duplicata
+  #    subject: "192.0.2.0/24"
+  #    reason: "two cards on the same subnet by choice (wired + wifi backup)"
+
+# ── Collector intervals (seconds) ─────────────────────────────────
+collect_interval_fast: 10    # traffic, interfaces, system
+collect_interval_slow: 60    # device scan, docker, systemd, WG peers, healthcheck
+
+# ── Network subnets ───────────────────────────────────────────────
+#  Single source for: nmap scan (scan: true), label and colour in the UI/map.
+#  Add, remove or rename your subnets here (no names hardcoded in the code).
+#
+#  REPLACE THESE WITH YOUR OWN. The ranges below are RFC 5737 documentation
+#  addresses: they exist so this file can be published, and they will not
+#  match any real network. With the wrong subnets, discovery finds nothing
+#  and the dashboard looks broken when it is only looking in the wrong place.
+subnets:
+  - cidr: "192.0.2.0/24"
+    label: "LAN"
+    color: "#5b9cf0"
+    scan: true
+  - cidr: "198.51.100.0/24"
+    label: "Lab"
+    color: "#5bd97f"
+    scan: true
+  - cidr: "10.100.0.0/24"
+    label: "WireGuard"
+    color: "#e6a94d"
+    scan: false        # VPN network: normally not scanned with nmap
+
+# ── Automatic discovery (pluggable sources) ───────────────────────
+#  Beyond DHCP/ARP from the router, LANMng enriches devices with:
+discovery:
+
+  # ping sweep: pings every address of the subnets with scan=true. It is the
+  # most responsive source (it finds a new address without waiting for the
+  # router's DHCP/ARP) and runs in the "fast" stage: its result shows up in
+  # the UI within seconds. On hosts with several interfaces on the same
+  # subnet it is also more reliable than nmap, which in that case may not
+  # receive the replies.
+  ping_sweep:
+    enabled: true
+    concurrency: 128          # parallel pings (higher = faster)
+    timeout: 1                # seconds to wait for a reply
+
+  # nmap: finds live hosts across the whole subnet (including ones not in
+  # DHCP/ARP), open ports, OS guess, vendor from the MAC. Requires nmap
+  # to be installed.
+  nmap:
+    enabled: true
+    ping_scan: true           # -sn: host discovery (fast)
+    # -sT on the ports below: the ports end up in the device detail card.
+    # Measured to cost 10-11s against the 9-46s of the ping scan alone,
+    # that is to say nothing: ports are only tried on the few hosts that
+    # answered.
+    port_scan: true
+    os_detection: false       # -O: requires root privileges
+    ports: "22,53,80,443,3000,8000,8080,9000,9090,51820"
+    extra_args: ""
+    # nmap looks at the uid to decide whether it is privileged and does not
+    # see the binary's capabilities: without this it falls back to a TCP
+    # ping towards port 80 and declares down every host that does not
+    # expose it. Leave it true.
+    privileged: true
+    # Outgoing interface. Empty (recommended) = the kernel routing decides,
+    # and it knows how to reach each subnet. Pinning it LOSES hosts when the
+    # machine has several cards: measured 7 hosts found without it, 4 with
+    # "enp1s0f0" and 5 with "wlp2s0". Set it only to force a precise path.
+    interface: ""
+    # Addresses (or CIDRs) probed with ping but NEVER port-scanned. It
+    # exists for the router: every TCP connect towards its ports ends up in
+    # its syslog, and with a 64 KB buffer the monitoring noise pushed the
+    # real events out in under an hour (measured: 226 lines out of 243 in 50
+    # minutes were ours, on port 22 of its six addresses; real logins were
+    # 17). Excluded addresses stay among the devices: they are covered by a
+    # dedicated ping scan.
+    port_scan_exclude: []
+    # Adds the router's addresses on its own: the one in `router.host` plus
+    # the ones the router declares on its own interfaces. They are read at
+    # runtime, so they stay correct even when the network changes.
+    port_scan_skip_router: true
+    # nmap resolves host names one at a time: on a real network that cost
+    # 27s over 8 hosts (against 3s with resolution off). Host names are
+    # already collected by the reverse_dns provider, in parallel: leave
+    # this false.
+    resolve_names: false
+
+  # SSH facts: the LAN is yours -> collect OS/services/docker from the hosts.
+  # Enable it and list the hosts reachable over SSH (a key is recommended).
+  #
+  # This list is also the SSH credential book: host resources, the terminal
+  # and the Windows services all read it, and they read it EVEN WITH
+  # `enabled: false`. So a host must be listed here even when SSH discovery
+  # stays off.
+  ssh:
+    enabled: false
+    default_user: "user"
+    default_key: "/app/ssh/id_ed25519"
+    connect_timeout: 5        # seconds: keeps a host that is down from slowing the scan
+    skip_offline: true        # do not try SSH towards hosts that do not answer ping
+    hosts:
+      - ip: "198.51.100.10"   # the host running LANMng
+      # - ip: "192.0.2.20"
+      #   user: "user"
+      #   key: "/app/ssh/id_ed25519"
+      #
+      # os: auto | linux | windows. With "auto" (the default) LANMng finds
+      # it out on the first connection and remembers it; you declare it only
+      # to force it. This is not cosmetic: over SSH a Windows PC answers
+      # with cmd.exe, where a Linux command does not fail but returns
+      # something meaningless, and the host would look broken.
+      # - ip: "192.0.2.12"
+      #   user: "winuser"     # the Windows user, not the one of the Linux servers
+      #   os: "windows"
+
+  # SNMP: for devices that expose it (APs, switches, printers).
+  snmp:
+    enabled: false
+    community: "public"
+    version: "2c"             # 1 | 2c
+    hosts: []                 # e.g. ["192.0.2.2", "192.0.2.50"]
+
+  # Reverse DNS: resolves host names via PTR using the system resolver
+  # (which on the LAN is the router/dnsmasq, so it covers .lan names too).
+  reverse_dns:
+    enabled: true
+
+# ── Catalogue paths (devices and services) ────────────────────────
+devices_catalog: "/app/config/devices.yaml"
+services_catalog: "/app/config/services.yaml"

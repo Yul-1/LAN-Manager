@@ -7,10 +7,12 @@ piccolo ufficio. Gira in Docker, e' raggiungibile **solo dalla rete privata**, e
 pensata per essere configurata dalla sua stessa interfaccia web invece che
 modificando file.
 
-> **Stato: primo rilascio pubblico in preparazione.**
-> Il codice viene reso generico e bilingue prima di arrivare qui. Fino alla versione
-> `0.2.0` questo repository contiene solo la licenza e la documentazione.
-> Vedi [CHANGELOG.md](CHANGELOG.md).
+> **Versione 1.0.0** — il primo rilascio pubblico. Vedi [CHANGELOG.md](CHANGELOG.md).
+>
+> Cosa non c'e' in questa release, detto chiaramente: la procedura guidata di
+> primo avvio descritta sotto non e' ancora stata costruita, quindi la
+> configurazione iniziale si fa copiando e modificando un modello, e
+> l'interfaccia per ora e' solo in italiano. Entrambe arrivano con la `1.1.0`.
 
 ## Cosa fa
 
@@ -63,17 +65,25 @@ modificando file.
 
 ## Avvio rapido
 
-> Disponibile dalla versione `0.2.0`.
-
 ```sh
 git clone https://github.com/Yul-1/LAN-Manager.git
 cd LAN-Manager
+
+# La tua configurazione. Modifica almeno il blocco `subnets`: il file esce con
+# intervalli di documentazione RFC 5737, che apposta non corrispondono a nessuna
+# rete vera.
+cp config/config.example.it.yaml config/config.yaml
+
 docker compose up --build
 ```
 
-Poi si apre la dashboard e si segue la procedura di primo avvio: chiede una password
-di amministratore, le subnet da scansionare e, se si vuole, il router e altri host
-Docker. Scrive lei la configurazione: per partire non c'e' niente da modificare a mano.
+La dashboard e' poi sulla porta 80 dell'host. Alla prima visita chiede di
+scegliere la password di amministratore, che viene salvata come hash bcrypt in
+`config/secrets.env` e mai in `config.yaml`.
+
+Se l'host ha gia' un suo nginx sulla porta 80, si usa il profilo alternativo
+`deploy/docker-compose.host-nginx.yml`, che avvia il solo backend e lascia al tuo
+nginx il compito di servire il frontend — vedi i commenti in quel file.
 
 ## Configurazione
 

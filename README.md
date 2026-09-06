@@ -6,10 +6,11 @@ Self-hosted dashboard to **manage, monitor and map your home or small-office LAN
 Runs in Docker, reachable **from your private network only**, and is meant to be
 configured from its own web UI rather than by editing files.
 
-> **Status: preparing the first public release.**
-> The code is being made generic and bilingual before it lands here. Until version
-> `0.2.0` this repository contains the license and the documentation only.
-> See [CHANGELOG.md](CHANGELOG.md).
+> **Version 1.0.0** - the first public release. See [CHANGELOG.md](CHANGELOG.md).
+>
+> Not in this release, and honest about it: the first-run wizard described below
+> is not built yet, so the initial configuration is done by copying and editing a
+> template, and the interface is currently in Italian only. Both land in `1.1.0`.
 
 ## What it does
 
@@ -60,18 +61,24 @@ configured from its own web UI rather than by editing files.
 
 ## Quick start
 
-> Available from `0.2.0`.
-
 ```sh
 git clone https://github.com/Yul-1/LAN-Manager.git
 cd LAN-Manager
+
+# Your configuration. Edit at least the `subnets` block: the file ships with
+# RFC 5737 documentation ranges, which match no real network on purpose.
+cp config/config.example.yaml config/config.yaml
+
 docker compose up --build
 ```
 
-Then open the dashboard and follow the first-run wizard: it asks for an admin
-password, the subnets to scan and, optionally, your router and any additional
-Docker hosts. It writes the configuration for you — there is nothing to edit by
-hand to get started.
+The dashboard is then on port 80 of the host. On first visit it asks you to
+choose the admin password, which is stored as a bcrypt hash in
+`config/secrets.env` and never in `config.yaml`.
+
+If the host already runs its own nginx on port 80, use the alternative profile
+`deploy/docker-compose.host-nginx.yml`, which starts the backend only and lets
+your nginx serve the frontend — see the comments in that file.
 
 ## Configuration
 

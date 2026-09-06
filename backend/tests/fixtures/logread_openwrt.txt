@@ -1,0 +1,10 @@
+Sun Aug 16 19:59:00 2026 cron.err crond[3772]: USER root pid 7467 cmd /root/check-modem.sh
+Sun Aug 16 19:59:01 2026 daemon.err dnsmasq[1234]: failed to send packet: Network unreachable
+Sun Aug 16 19:59:02 2026 daemon.warn odhcpd[1500]: DHCPV6 SOLICIT from unknown duid
+Sun Aug 16 19:59:03 2026 daemon.info dnsmasq-dhcp[1234]: DHCPACK(br-lan) 192.0.2.50 aa:bb:cc:dd:ee:ff stampante
+Sun Aug 16 19:59:04 2026 kern.crit kernel: [12345.678] Out of memory: Killed process 999
+Sun Aug 16 19:59:05 2026 user.notice root: wireguard: peer handshake completed
+Sun Aug 16 19:59:06 daemon.err dropbear[8001]: Exit before auth: Disconnect received
+Sun Aug 16 19:59:07 cron.err crond[3772]: USER root pid 7480 cmd /root/check-modem.sh
+    continuazione di una riga precedente, senza timestamp
+Sun Aug 16 19:59:08 2026 daemon.info netifd: wan (900): udhcpc: sending renew to 203.0.113.1

@@ -1,0 +1,83 @@
+# LANMng — stack di esecuzione per un host che ha GIA' un nginx suo.
+#
+# Scenario: sull'host c'e' gia' un nginx (systemd) che occupa la porta 80 e fa
+# da reverse proxy ad altri servizi. Qui NON avviamo il nostro nginx: il
+# frontend e il proxy verso il backend li serve l'nginx dell'host (vedi
+# deploy/lanmng.nginx.conf, in ascolto su :81). Questo compose avvia quindi
+# SOLO il backend. Per lo scenario normale usa il docker-compose.yml nella
+# radice del repo, che avvia anche nginx.
+#
+# Le immagini si caricano da tar (docker load): niente build.
+# Avvio:  TAG=0.1.0 docker compose -f docker-compose.host-nginx.yml up -d
+#
+# Layout atteso accanto a questo file:
+#   ./config/   config.yaml, secrets.env, devices.yaml   (montato in rw)
+#   ./ssh/      id_ed25519 (chiave router, ro) — opzionale finche' non si configura il router
+
+services:
+  backend:
+    image: lanmng-backend:${TAG:-latest}
+    container_name: lanmng-backend
+    restart: unless-stopped
+    # Host network: la discovery (nmap/ARP) deve vedere le subnet della LAN.
+    # Il backend resta in ascolto solo su 127.0.0.1:8000 (lo espone l'nginx host).
+    network_mode: host
+    # Il set di capability di default di Docker concede cose che qui non servono
+    # mai (MKNOD, SYS_CHROOT, SETUID/SETGID, DAC_OVERRIDE...): il backend gira
+    # come appuser, ascolta su 127.0.0.1:8000, non crea device e non cambia
+    # identita'. Si tiene solo cio' che serve al ping-scan (vedi setcap nel
+    # Dockerfile): NET_RAW per i raw socket, NET_ADMIN perche' il bit "effective"
+    # del setcap di nmap fa fallire l'exec con EPERM se una capability del file
+    # manca dal bounding set del container.
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    # no-new-privileges NON e' abilitato di proposito: renderebbe inerti le
+    # file-capability, rompendo sia nmap sia il ping sweep (/usr/bin/ping ha
+    # cap_net_raw=ep di serie in Debian). L'escalation che quella flag mitiga
+    # richiede di piantare un binario a runtime, ed e' gia' chiusa da read_only.
+    #
+    # Rootfs in sola lettura: tutte le scritture del backend (config.yaml e i
+    # suoi backup, devices/services, secrets.env, audit.log) finiscono in
+    # /app/config, che resta scrivibile perche' e' un bind mount esplicito.
+    # /tmp e' un tmpfs per difesa in profondita': oggi nessun modulo lo usa.
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    # Tetti volutamente larghi: il consumo di base e' un solo event loop uvicorn
+    # (~150MB), il picco e' il ping sweep (fino a 128 processi "ping" concorrenti,
+    # limitati dal semaforo in services/ping.py) piu' nmap. Da tarare guardando
+    # "docker stats" dopo qualche giorno di esercizio reale.
+    mem_limit: 512m
+    cpus: 2.0
+    pids_limit: 300
+    # Senza tetto, un servizio always-on con restart automatico riempie il disco
+    # dell'host in /var/lib/docker/containers.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Il socket Docker e' root:docker: il container gira come appuser (uid 1000)
+    # che NON e' in quel gruppo, quindi aggiungiamo il gid del gruppo docker
+    # dell'host come gruppo supplementare, per leggere /var/run/docker.sock senza
+    # girare da root. Il gid cambia da host a host: ricavalo con
+    #   getent group docker | cut -d: -f3
+    # e mettilo in DOCKER_GID (nel file .env accanto a questo compose).
+    group_add:
+      - "${DOCKER_GID:?serve il gid del gruppo docker dell'host: getent group docker}"
+    volumes:
+      - ./config:/app/config:rw                       # editabile da UI -> rw
+      - ./ssh:/app/ssh:ro                             # chiave SSH router (ro)
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # monitor Docker locale (ro)
+    # Nota: nessun mount /etc/wireguard. Se WireGuard non gira su questo host
+    # (spesso sta sul router) l'interfaccia qui non esiste: lo stato WG va preso
+    # dal device che lo ospita e si configura a parte.
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://127.0.0.1:8000/health').status==200 else sys.exit(1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3

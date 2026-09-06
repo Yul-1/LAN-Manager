@@ -1,0 +1,869 @@
+/* ===================================================================
+   LANMng — design system (sei temi)
+   Nessuna dipendenza esterna (LAN-only / offline): solo system fonts.
+
+   Un tema = UN blocco `:root[data-tema="..."]` che ridichiara i 21 token
+   base qui sotto. Tutto il resto (bordi tinti, sfondi dei chip, banner,
+   evidenziatore del log...) e' DERIVATO una volta sola con color-mix piu'
+   in basso: aggiungere un tema non deve voler dire riscrivere il design
+   system, altrimenti il settimo non lo aggiunge nessuno.
+
+   Due regole sui token base, e non sono estetiche:
+     1. sono in **hex**, perche' li rilegge anche il JavaScript
+        (`paletteTema()` in app.js: canvas e SVG non leggono le variabili
+        CSS) e `drawLineChart` concatena l'alfa ai colori delle linee
+        (`L.color + "40"` per la sfumatura sotto la curva);
+     2. --velo e --tip sono a 8 cifre perche' devono essere semitrasparenti.
+
+   Il tema si sceglie in Impostazioni e si ricorda nel localStorage del
+   browser: e' una preferenza di chi guarda, non della macchina. L'attributo
+   lo stampa lo script in testa a index.html, prima che il CSS dipinga.
+   =================================================================== */
+
+/* ── Tema 1: dark (il default) ───────────────────────────────────── */
+/* I blocchi dei temi NON sono legati a `:root`: valgono per qualunque elemento
+   che porti l'attributo, e per il suo sottoalbero. Cosi' il selettore in
+   Impostazioni puo' far vedere ogni tema addosso al proprio pulsante, senza una
+   seconda tavolozza scritta in JavaScript per disegnare i campioni. */
+:root, [data-tema="dark"] {
+  color-scheme: dark;
+  --bg:        #0f1117;
+  --bg-2:      #141823;
+  --panel:     #171b27;
+  --panel-2:   #1c2130;
+  --border:    #262c3d;
+  --border-2:  #323a4f;
+  --text:      #dde3ee;
+  --muted:     #8b94a8;
+  --faint:     #5c6479;
+
+  --teal:      #4dd6e0;
+  --green:     #5bd97f;
+  --orange:    #e6a94d;
+  --red:       #e2685a;
+  --purple:    #9d8bf0;
+  --blue:      #5b9cf0;
+
+  --code-bg:   #0c0f16;   /* fondo del log e dell'editor YAML */
+  --grid:      #222838;   /* griglia dei grafici (canvas) */
+  --off:       #39405a;   /* nodi e link spenti della mappa (SVG) */
+  --velo:      #06080ca8; /* velo dietro alle modali */
+  --tip:       #171b27ee; /* riquadro di lettura del grafico, legenda mappa */
+  --font-base: 14px;
+}
+
+/* ── Tema 2: pastello — pastelli veri, chiaro E scuro ─────────────
+   Rifatto (0.1.82). Prima i pastelli erano accesi ma le tre superfici
+   erano tutte della stessa tinta scura: la pagina sembrava un unico
+   blocco viola. Ora la chroma degli accenti scende e la luminosita' sale
+   (pastelli davvero pastello), e soprattutto le profondita' si separano:
+   il fondo pagina e' un prugna profondo (--bg), i pannelli un lilla medio
+   (--panel/--panel-2) e la barra laterale con la topbar sono il tono piu'
+   CHIARO di tutti (--bg-2). E' la combinazione chiaro/scuro chiesta dal
+   proprietario: si distinguono senza bordi, e il testo resta chiaro su
+   tutte e tre. */
+[data-tema="pastello"] {
+  color-scheme: dark;
+  --bg:        #1f1b2b;
+  --bg-2:      #544a75;
+  --panel:     #453c63;
+  --panel-2:   #564b7c;
+  --border:    #6c5f98;
+  --border-2:  #8878bd;
+  --text:      #f6f2ff;
+  --muted:     #d4cbec;
+  --faint:     #b1a6d2;
+
+  --teal:      #9ff0e4;
+  --green:     #bdedb0;
+  --orange:    #ffdfa8;
+  --red:       #ffb3bd;
+  --purple:    #dcc2ff;
+  --blue:      #b7d6ff;
+
+  --code-bg:   #191627;
+  --grid:      #6c5f98;
+  --off:       #8878bd;
+  --velo:      #191627c2;
+  --tip:       #453c63f2;
+  --font-base: 14px;
+}
+
+/* ── Tema 3: neon — azzurro, acceso sui bordi e sui numeri ────────
+   Rifatto (0.1.82). Il neon passa dal viola/magenta all'AZZURRO (bordi e
+   accento ciano) e l'interno dei pannelli smette di essere colorato: nero
+   e grigio-blu quasi neutri, cosi' la tinta sta solo dove fa da linea o
+   da luce. L'alone si estende a titoli delle card, valori KPI, marchio e
+   velocita' del traffico (regole in fondo al file); il testo corrente NO,
+   un paragrafo con il text-shadow non si legge. --muted e --faint sono
+   grigi freddi e non piu' viola: su nero pieno il grigio-viola spariva. */
+[data-tema="neon"] {
+  color-scheme: dark;
+  --bg:        #000205;
+  --bg-2:      #03070b;
+  --panel:     #060b11;
+  --panel-2:   #0d151d;
+  --border:    #0f9ec4;
+  --border-2:  #2ddcff;
+  --text:      #eaf7ff;
+  --muted:     #9fc0d2;
+  --faint:     #6f8ea1;
+
+  --teal:      #25f0ff;
+  --green:     #2dffa8;
+  --orange:    #ffc61a;
+  --red:       #ff3b6f;
+  --purple:    #9b6bff;
+  --blue:      #4bb8ff;
+
+  --code-bg:   #02060a;
+  --grid:      #0b3a4d;
+  --off:       #2a5666;
+  --velo:      #000205d1;
+  --tip:       #060b11f7;
+  --font-base: 14px;
+}
+
+/* ── Tema 4: chiaro — carta calda, niente bianco pieno ────────────
+   Rifatto (0.1.82). Il fastidio del chiaro non era il contrasto ma il
+   bagliore: fondo azzurrino freddo, pannelli #ffffff e bordi grigio-blu
+   marcati. Ora la scala e' neutra-calda, il pannello e' un bianco appena
+   sporco e i bordi sono piu' tenui. Il testo e' quasi nero (14:1 sul
+   pannello), --muted e --faint stanno sopra 7:1, e gli accenti sono stati
+   scuriti ancora: sul chiaro un accento vivace e' proprio quello che non
+   si legge. Fondo e pannello restano abbastanza distanti da vedersi. */
+[data-tema="chiaro"] {
+  color-scheme: light;
+  --bg:        #e4e2dd;
+  --bg-2:      #dcd9d2;
+  --panel:     #fdfdfc;
+  --panel-2:   #f0eeea;
+  --border:    #c7c3ba;
+  --border-2:  #8f8a81;
+  --text:      #141310;
+  --muted:     #45433d;
+  --faint:     #605d56;
+
+  --teal:      #0f5f6b;
+  --green:     #14622f;
+  --orange:    #7a4600;
+  --red:       #9c2317;
+  --purple:    #4f2b9e;
+  --blue:      #10498c;
+
+  --code-bg:   #f4f2ee;
+  --grid:      #d5d1c9;
+  --off:       #9d978e;
+  --velo:      #141310a8;
+  --tip:       #fdfdfcf7;
+  --font-base: 14px;
+}
+
+/* ── Tema 5: alto contrasto — si legge da lontano ─────────────────
+   Una dashboard si guarda di sfuggita e spesso da lontano; questo tema
+   serve anche a chi ha poca vista, che e' il caso di accessibilita' piu'
+   probabile su uno strumento personale. Nero e bianco pieni e il carattere
+   di base piu' grande, che e' l'unica cosa che il colore da solo non puo'
+   compensare. Nel giro del 0.1.82 sono cambiati solo i due bordi, di un
+   tono piu' chiaro: le linee delle tabelle si vedono anche su schermi
+   opachi. */
+[data-tema="contrasto"] {
+  color-scheme: dark;
+  --bg:        #000000;
+  --bg-2:      #000000;
+  --panel:     #0b0b0e;
+  --panel-2:   #17171d;
+  --border:    #70707e;
+  --border-2:  #a0a0af;
+  --text:      #ffffff;
+  --muted:     #e0e0e8;
+  --faint:     #b6b6c2;
+
+  --teal:      #5ce9ff;
+  --green:     #4dff70;
+  --orange:    #ffc233;
+  --red:       #ff5d52;
+  --purple:    #cf9bff;
+  --blue:      #6aaeff;
+
+  --code-bg:   #000000;
+  --grid:      #4a4a56;
+  --off:       #74748a;
+  --velo:      #000000cc;
+  --tip:       #0b0b0ef7;
+  --font-base: 15.5px;
+}
+
+/* ── Tema 6: senape — grigio caldo, senape sui bordi ──────────────
+   L'id resta "ambra" perche' e' quello gia' salvato nei localStorage dei
+   browser; il nome mostrato e' Senape (0.1.82). Prima era ambra su ambra:
+   fondo giallo-bruno, TESTO giallo (#ffd08a), accento giallo. Tutto acceso
+   e niente su cui riposare l'occhio. Ora il fondo e' un grigio caldo neutro
+   e il testo e' crema: il giallo senape resta l'identita' ma solo dove
+   serve a segnare qualcosa — bordi (--border-2), accento principale
+   (--teal: pillole, link, pulsanti, linea del grafico). Gli stati restano
+   di colore proprio, cosi' "su", "giu'", warning ed errore si distinguono
+   senza leggerli. */
+[data-tema="ambra"] {
+  color-scheme: dark;
+  --bg:        #16140f;
+  --bg-2:      #1c1a14;
+  --panel:     #221f18;
+  --panel-2:   #2c2820;
+  --border:    #413a2c;
+  --border-2:  #6b5c33;
+  --text:      #ece6d8;
+  --muted:     #b5ab94;
+  --faint:     #8b826d;
+
+  --teal:      #d9b24a;
+  --green:     #8fbf5a;
+  --orange:    #e0913c;
+  --red:       #e2685a;
+  --purple:    #c08ad0;
+  --blue:      #6bb6d9;
+
+  --code-bg:   #100e0a;
+  --grid:      #3a3427;
+  --off:       #5c5340;
+  --velo:      #16140fd1;
+  --tip:       #221f18f7;
+  --font-base: 14px;
+}
+
+/* ── Token derivati: si calcolano dai base, una volta per tutti ────
+   Stanno su `:root` come i base: color-mix legge il valore che ha vinto la
+   cascata sullo stesso elemento, quindi seguono da soli il tema attivo.
+   Nessuno di questi viene letto dal JavaScript: li usa solo il CSS. */
+:root {
+  --bd-teal:   color-mix(in srgb, var(--teal) 42%, var(--panel));
+  --bd-green:  color-mix(in srgb, var(--green) 42%, var(--panel));
+  --bd-orange: color-mix(in srgb, var(--orange) 42%, var(--panel));
+  --bd-red:    color-mix(in srgb, var(--red) 45%, var(--panel));
+  --bd-purple: color-mix(in srgb, var(--purple) 42%, var(--panel));
+  --bg-ok:     color-mix(in srgb, var(--green) 13%, var(--panel));
+  --bg-giu:    color-mix(in srgb, var(--red) 14%, var(--panel));
+  --bg-crit:   color-mix(in srgb, var(--red) 22%, var(--panel));
+  --banner-bg: color-mix(in srgb, var(--red) 20%, var(--bg));
+  --banner-fg: color-mix(in srgb, var(--red) 62%, var(--text));
+  --mark-bg:   color-mix(in srgb, var(--blue) 28%, var(--code-bg));
+  --map-bg:    color-mix(in srgb, var(--blue) 9%, var(--panel));
+
+  --radius:    10px;
+  --mono: ui-monospace, "Cascadia Code", "Geist Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, Inter, sans-serif;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: var(--font-base);
+  line-height: 1.5;
+}
+a { color: var(--teal); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Layout ──────────────────────────────────────────────────────── */
+.app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+
+.sidebar {
+  background: var(--bg-2);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  position: sticky; top: 0; height: 100vh;
+}
+.brand {
+  padding: 18px 18px 14px; font-family: var(--mono);
+  font-weight: 600; font-size: 17px; letter-spacing: .5px;
+  display: flex; align-items: center; gap: 8px;
+}
+.brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--teal);
+  box-shadow: 0 0 10px var(--teal); }
+.nav { padding: 6px; flex: 1; overflow-y: auto; }
+.nav a {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 12px; margin: 2px 0; border-radius: 8px;
+  color: var(--muted); font-weight: 500; cursor: pointer;
+}
+.nav a:hover { background: var(--panel); color: var(--text); text-decoration: none; }
+.nav a.active { background: var(--panel-2); color: var(--teal); }
+.nav a svg { width: 16px; height: 16px; flex: none; opacity: .7; }
+.nav a.active svg, .nav a:hover svg { opacity: 1; }
+/* Undici voci di fila sono tante da scorrere: i titoletti danno alla barra
+   una forma, cosi' si punta al gruppo prima che alla voce. */
+.nav-sez {
+  padding: 14px 12px 4px; font-size: 10px; font-weight: 600;
+  letter-spacing: .09em; text-transform: uppercase; color: var(--faint);
+}
+.nav-sez:first-child { padding-top: 4px; }
+.nav a .badge { margin-left: auto; font-size: 11px; font-family: var(--mono); }
+/* Secondo badge: gli alert. Il primo (conteggi) si prende il margin-left:auto,
+   questo gli sta accanto. Acceso solo per warn e critical: un contatore sempre
+   acceso e' la versione in miniatura del difetto da cui nascono gli alert. */
+.nav a .badge.alert {
+  margin-left: 6px; padding: 0 6px; border-radius: 9px;
+  background: var(--panel-2); color: var(--orange); font-weight: 600;
+}
+.nav a .badge.alert.critical { background: var(--bg-crit); color: var(--red); }
+
+/* Alert di pagina: stanno in testa alla pagina che possiede l'oggetto. */
+.alert-box:not(:empty) { margin-bottom: 14px; }
+.alert-riga {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 10px 12px; margin-bottom: 8px; font-size: 13px; line-height: 1.5;
+  background: var(--panel); border: 1px solid var(--border-2); border-radius: 9px;
+  border-left: 3px solid var(--orange);
+}
+.alert-riga.critical { border-left-color: var(--red); }
+.alert-riga.info { border-left-color: var(--faint); }
+.alert-riga .alert-testo { flex: 1; min-width: 0; }
+.alert-riga .alert-azione { color: var(--muted); font-size: 12px; margin-top: 3px; }
+
+.sidebar .foot {
+  padding: 10px 16px; border-top: 1px solid var(--border);
+  font-size: 12px; color: var(--faint); font-family: var(--mono);
+}
+
+/* Velo dietro al drawer: esiste solo da mobile (vedi la sezione in fondo),
+   qui resta inerte perche' il drawer non c'e'. */
+.nav-scrim { display: none; }
+
+/* Hamburger: nascosto finche' la sidebar e' visibile da sola. */
+.navbtn {
+  display: none; background: var(--panel); border: 1px solid var(--border-2);
+  color: var(--text); border-radius: 8px; width: 38px; height: 34px;
+  font-size: 17px; line-height: 1; cursor: pointer; flex: none;
+}
+.navbtn:hover { border-color: var(--teal); color: var(--teal); }
+
+.main { display: flex; flex-direction: column; min-width: 0; }
+.topbar {
+  display: flex; align-items: center; gap: 14px;
+  padding: 12px 22px; border-bottom: 1px solid var(--border);
+  background: var(--bg-2); position: sticky; top: 0; z-index: 5;
+}
+.topbar h1 { font-size: 16px; margin: 0; font-weight: 600; }
+.topbar .spacer { flex: 1; }
+.content { padding: 22px; max-width: 1400px; width: 100%; }
+
+/* Avviso di sicurezza: sta sopra i contenuti e non si chiude, perche' segnala
+   un servizio raggiungibile senza login (vedi security_warnings nel backend). */
+.sec-banner {
+  padding: 11px 22px; background: var(--banner-bg); border-bottom: 1px solid var(--bd-red);
+  color: var(--red); font-size: 13px; line-height: 1.5;
+}
+.sec-banner b { color: var(--banner-fg); }
+.sec-banner ul { margin: 6px 0 0; padding-left: 18px; }
+
+/* Notifiche: in basso a destra, sovrapposte. Non spostano il contenuto (una
+   banda a tutta larghezza farebbe saltare la pagina ad ogni errore) e su un
+   telefono restano sopra il pollice. Gli errori con un'azione non si
+   autochiudono: sparire mentre si sta per ripetere l'operazione e' il momento
+   sbagliato. */
+.toasts {
+  position: fixed; right: 18px; bottom: 18px; z-index: 50;
+  display: flex; flex-direction: column; gap: 8px;
+  max-width: 380px; pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 12px; border-radius: var(--radius); font-size: 13px; line-height: 1.45;
+  background: var(--panel); border: 1px solid var(--border-2);
+  /* L'ombra resta nera in tutti i temi: un'ombra e' mancanza di luce, non
+     un colore del tema, e tinta di chiaro sparirebbe sul fondo chiaro. */
+  box-shadow: 0 8px 24px rgba(0,0,0,.45);
+}
+.toast .msg { flex: 1; word-break: break-word; }
+.toast.err  { color: var(--red);    border-color: var(--bd-red); }
+.toast.warn { color: var(--orange); border-color: var(--bd-orange); }
+.toast.ok   { color: var(--green);  border-color: var(--bd-green); }
+.toast.info { color: var(--text); }
+.toast .act {
+  flex: none; background: none; border: 1px solid currentColor; color: inherit;
+  border-radius: 7px; padding: 3px 9px; font-size: 12px; cursor: pointer;
+  font-family: inherit;
+}
+.toast .x {
+  flex: none; background: none; border: none; color: var(--faint);
+  font-size: 16px; line-height: 1; cursor: pointer; padding: 0 2px;
+}
+.toast .x:hover { color: var(--text); }
+
+/* ── Connessione / pill ─────────────────────────────────────────── */
+.pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px; font-size: 12px;
+  font-family: var(--mono); background: var(--panel); border: 1px solid var(--border);
+}
+.pill .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--faint); }
+.pill.ok   { color: var(--green); }  .pill.ok .dot   { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.pill.warn { color: var(--orange); } .pill.warn .dot { background: var(--orange); }
+.pill.down { color: var(--red); }    .pill.down .dot { background: var(--red); }
+
+/* ── Card / grid ────────────────────────────────────────────────── */
+.grid { display: grid; gap: 14px; }
+.grid.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.grid.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.grid.cols-2 { grid-template-columns: repeat(2, 1fr); }
+/* Due colonne disuguali: il grafico e le tabelle larghe vogliono spazio, un
+   elenco di peer o una tabella chiave/valore no. Con due meta' uguali la
+   colonna stretta restava mezza vuota e la pagina sembrava incompiuta. */
+.grid.cols-2-1 { grid-template-columns: 2fr 1fr; }
+@media (max-width: 1100px) {
+  .grid.cols-4 { grid-template-columns: repeat(2,1fr); }
+  .grid.cols-2-1 { grid-template-columns: 1fr; }
+}
+/* Sotto i 760px le griglie diventano una colonna sola; il resto del
+   comportamento mobile sta nella sezione finale del file. */
+@media (max-width: 760px)  { .grid { grid-template-columns: 1fr !important; } }
+
+.card {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px;
+}
+.card h3 { margin: 0 0 12px; font-size: 13px; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .6px; font-weight: 600;
+  display: flex; align-items: center; gap: 8px; }
+.card h3 .right { margin-left: auto; font-size: 12px; text-transform: none; letter-spacing: 0; }
+
+/* KPI */
+/* Riquadri pieni, senza il bordo delle card: la fascia in alto e' un blocco di
+   numeri, non quattro pannelli, e con meno linee si legge piu' in fretta. */
+.kpi { background: var(--panel-2); border-color: transparent; padding: 14px 16px; }
+/* baseline, non center: "/23" e' piu' piccolo del numero e deve poggiare sulla
+   stessa riga, come faceva prima che questa diventasse una flexbox. */
+.kpi .val { font-size: 30px; font-weight: 650; font-family: var(--mono); line-height: 1.1;
+  display: flex; align-items: baseline; }
+/* Etichetta, ora in cima: piccola e in maiuscoletto, non deve competere col numero. */
+.kpi .sub { color: var(--faint); font-size: 10.5px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 7px; }
+.kpi .val .unit { font-size: 15px; color: var(--muted); }
+/* Queste tre regole non esistevano: kpi() passava "green"/"orange"/"red" da
+   sempre, ma nessun selettore le raccoglieva e ogni numero rendeva grigio come
+   gli altri, giu' o su che fosse. Valgono anche per Servizi e WireGuard. */
+.kpi .val.green  { color: var(--green); }
+.kpi .val.orange { color: var(--orange); }
+.kpi .val.red    { color: var(--red); }
+/* Valore in parole ("connessa") invece che in cifre: a 30px mono sforerebbe. */
+.kpi .val.testo  { font-size: 21px; }
+.kpi .val .status-dot { width: 10px; height: 10px; margin-right: 9px; align-self: center; }
+/* Riga di contesto: il numero dice quanti, questa dice se c'e' da fare qualcosa. */
+.kpi .ctx { color: var(--faint); font-size: 11.5px; margin-top: 6px; }
+.kpi.clic { cursor: pointer; }
+.kpi.clic:hover { border-color: var(--border-2); }
+
+/* Chip di stato: fondo tinto al posto del testo grigio. "attivo" e "fermo" in
+   grigio si distinguono solo leggendoli; colorati si contano a colpo d'occhio. */
+.chip { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+  font-family: var(--mono); font-size: 11px; padding: 2px 8px; border-radius: 5px;
+  background: var(--panel-2); color: var(--muted); }
+.chip.ok     { background: var(--bg-ok);  color: var(--green); }
+.chip.giu    { background: var(--bg-giu); color: var(--red); }
+.chip.ignoto { background: var(--panel-2); color: var(--faint); }
+
+/* ── Tabelle ────────────────────────────────────────────────────── */
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--border); }
+th { color: var(--muted); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+tbody tr:hover { background: var(--panel-2); }
+td.mono, .mono { font-family: var(--mono); }
+.tag { display: inline-block; padding: 1px 7px; border-radius: 6px; font-size: 11px;
+  font-family: var(--mono); background: var(--panel-2); border: 1px solid var(--border-2);
+  color: var(--muted); margin: 1px 2px 1px 0; }
+.tag.teal { color: var(--teal); border-color: var(--bd-teal); }
+.tag.green{ color: var(--green); border-color: var(--bd-green); }
+.tag.purple{ color: var(--purple); border-color: var(--bd-purple); }
+.tag.red  { color: var(--red); border-color: var(--bd-red); }
+.tag.orange{ color: var(--orange); border-color: var(--bd-orange); }
+/* Il filtro per livello acceso: si distingue dal bordo, non dal colore, cosi'
+   "3 errori selezionato" resta rosso e continua a dire quello che dice. */
+.tag.attivo { border-color: currentColor; background: var(--panel); }
+
+.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+.s-on  { background: var(--green); box-shadow: 0 0 7px var(--green); }
+.s-off { background: var(--faint); }
+.s-warn{ background: var(--orange); }
+.s-down{ background: var(--red); box-shadow: 0 0 7px var(--red); }
+
+/* ── Controlli ──────────────────────────────────────────────────── */
+.controls { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 14px; align-items: center; }
+input[type=text], select, button.btn {
+  background: var(--panel); border: 1px solid var(--border-2); color: var(--text);
+  border-radius: 8px; padding: 7px 11px; font-family: var(--sans); font-size: 13px;
+}
+input[type=text] { min-width: 200px; }
+button.btn { cursor: pointer; }
+button.btn:hover { border-color: var(--teal); color: var(--teal); }
+.seg { display: inline-flex; border: 1px solid var(--border-2); border-radius: 8px; overflow: hidden; }
+.seg button { background: var(--panel); border: 0; color: var(--muted); padding: 7px 12px; cursor: pointer; font-size: 13px; }
+.seg button.active { background: var(--panel-2); color: var(--teal); }
+
+/* Sotto-tab di sezione (Monitoraggio: Servizi | Risorse) */
+.seg.subtabs { margin-bottom: 14px; }
+.seg.subtabs button { padding: 8px 18px; font-weight: 500; }
+/* Riga dei sotto-tab: countdown e aggiornamento manuale spinti a destra,
+   cosi' restano visibili senza rubare spazio ai tab. */
+.subtabs-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.subtabs-bar .seg.subtabs { margin-bottom: 0; }
+.subtabs-bar #mon-eta { margin-left: auto; font-size: 12px; }
+.subtabs-bar #mon-refresh { padding: 6px 12px; }
+
+/* ── Risorse host: barre per core ───────────────────────────────── */
+/* Una colonna per core: la barra dice il carico, il numero il valore esatto.
+   auto-fit perche' il numero di core cambia da host a host. */
+.cores { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 6px 12px; margin: 4px 0 12px; }
+.cores .core { display: flex; align-items: center; gap: 6px; }
+.cores .core .bar { flex: 1; min-width: 28px; background: var(--bg-2);
+  border: 1px solid var(--border); }
+.cores .core span { font-size: 11px; }
+.cores .core span:first-child { min-width: 16px; }
+.cores .core span:last-child { min-width: 24px; text-align: right; }
+.faint { color: var(--faint); }
+
+/* ── Mappa ──────────────────────────────────────────────────────── */
+.mapwrap { position: relative; background:
+  radial-gradient(circle at 50% 40%, var(--map-bg) 0%, var(--panel) 70%);
+  border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+/* touch-action pan-y: da telefono un dito sulla mappa scorre la pagina, a meno
+   che non sia partito da un nodo (in quel caso il drag chiama preventDefault). */
+#lanmap { display: block; width: 100%; height: 520px; cursor: grab; touch-action: pan-y; }
+#lanmap.grabbing { cursor: grabbing; }
+/* Lo sfondo non e' decorazione: la legenda sta SOPRA l'SVG, e un nodo che
+   capita li' sotto la rendeva illeggibile a meta' (visto sull'istanza, con la
+   mappa zoomata). Semitrasparente, cosi' non nasconde del tutto cosa c'e'. */
+.map-legend { position: absolute; bottom: 10px; left: 12px; display: flex; gap: 12px;
+  font-size: 12px; color: var(--muted); font-family: var(--mono); flex-wrap: wrap;
+  background: var(--tip); padding: 4px 9px; border-radius: 7px;
+  max-width: calc(100% - 24px); }
+.map-legend span { display: inline-flex; align-items: center; gap: 5px; }
+/* Comandi dello zoom: in alto a destra, dove non coprono ne' la legenda ne' il
+   router al centro. Smorzati finche' la mappa e' alla vista intera, cosi' non
+   tirano l'occhio quando non c'e' niente da azzerare. */
+.map-zoom { position: absolute; top: 10px; right: 12px; display: flex; gap: 6px;
+  opacity: .45; transition: opacity .15s; }
+.map-zoom:hover, .map-zoom.attivo { opacity: 1; }
+.map-zoom .btn { padding: 2px 9px; font-family: var(--mono); line-height: 1.4; }
+
+/* ── Bars / mini ────────────────────────────────────────────────── */
+.bar { height: 6px; background: var(--panel-2); border-radius: 4px; overflow: hidden; }
+.bar > i { display: block; height: 100%; background: var(--teal); }
+.bar > i.green { background: var(--green); }
+.bar > i.orange { background: var(--orange); }
+.bar > i.red { background: var(--red); }
+
+.muted { color: var(--muted); }
+.right { text-align: right; }
+.nowrap { white-space: nowrap; }
+.empty { color: var(--faint); padding: 22px; text-align: center; font-style: italic; }
+.alert-row { color: var(--orange); }
+/* Il conteggio in testa alla card distingue critici e warning: le righe devono
+   dire la stessa cosa, altrimenti si contraddicono a colpo d'occhio. */
+.alert-row.critical { color: var(--red); }
+
+/* log viewer */
+.logbox { background: var(--code-bg); border: 1px solid var(--border); border-radius: var(--radius);
+  font-family: var(--mono); font-size: 12.5px; padding: 12px; max-height: 64vh; overflow: auto; }
+.logbox .l { padding: 1px 0; white-space: pre-wrap; word-break: break-word; }
+.logbox .l.error { color: var(--red); }
+.logbox .l.warn { color: var(--orange); }
+.logbox .l.debug { color: var(--faint); }
+.logbox .l .t { color: var(--faint); }
+.logbox .l .src { color: var(--teal); }
+/* Il termine cercato dentro la riga. Sfondo tenue e colore ereditato: un
+   evidenziatore giallo pieno cancellerebbe il livello, che qui e' il colore. */
+.logbox mark { background: var(--mark-bg); color: inherit; border-radius: 2px; padding: 0 1px; }
+
+/* Conteggi per livello sopra al log. Sono pulsanti: filtrano. */
+.log-livelli { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.log-livelli .tag { cursor: pointer; padding: 3px 9px; font-size: 12px; }
+
+/* spark/chart canvas */
+/* I comandi dello zoom del grafico: stesso aspetto e stessa regola di
+   `.map-zoom` (smorzati finche' non c'e' niente da azzerare). Il contenitore
+   lo crea `montaComandiGrafico()` avvolgendo il canvas, perche' i grafici
+   nascono in quattro template diversi. */
+.chart-wrap { position: relative; }
+.chart-zoom { position: absolute; top: 6px; right: 8px; display: flex; gap: 5px;
+  opacity: .45; transition: opacity .15s; }
+.chart-wrap:hover .chart-zoom, .chart-zoom.attivo { opacity: 1; }
+.chart-zoom .btn { padding: 1px 8px; font-family: var(--mono); line-height: 1.4;
+  font-size: 13px; }
+
+/* touch-action pan-y: un dito sul grafico legge il punto e la pagina continua a
+   scorrere; il pizzico a due dita chiama preventDefault e zooma. `crosshair`
+   dice che il grafico si puo' interrogare, cosa che un canvas muto non fa. */
+.chart { width: 100%; height: 180px; display: block; cursor: crosshair;
+  touch-action: pan-y; }
+.chart.tall { height: 240px; }
+.legend-line { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); margin-right: 14px; }
+.legend-line i { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+/* Velocita' correnti sotto il grafico: grandi abbastanza da leggersi da
+   lontano, che e' come si guarda una dashboard. */
+.rates { display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap; margin-top: 10px; }
+.rates .rate { display: inline-flex; align-items: baseline; gap: 7px;
+  font-family: var(--mono); font-size: 17px; font-weight: 600; }
+.rates .rate i { width: 10px; height: 10px; border-radius: 3px; display: inline-block;
+  align-self: center; }
+
+/* ── Bottoni azione + modale ────────────────────────────────────── */
+.iconbtn {
+  background: var(--panel-2); border: 1px solid var(--border-2); color: var(--muted);
+  border-radius: 6px; width: 28px; height: 26px; cursor: pointer; font-size: 13px; margin-left: 4px;
+}
+.iconbtn:hover { color: var(--teal); border-color: var(--teal); }
+/* Icone disegnate dentro i bottoni: seguono il colore del bottone (currentColor)
+   e restano allineate al testo accanto. */
+.iconbtn svg { width: 14px; height: 14px; vertical-align: -2px; }
+
+/* nome cliccabile + scheda dettagli espandibile */
+a.link { color: var(--text); cursor: pointer; }
+a.link:hover { color: var(--teal); }
+
+/* ── Dispositivi: elenco a righe, scheda al clic ────────────────
+   L'elenco resta una tabella: venti dispositivi si confrontano scorrendo con
+   gli occhi una colonna, non saltando fra venti riquadri. La scheda del
+   singolo invece e' una card, e compare sotto la sua riga. */
+.dev-riga.aperta > td { background: var(--panel-2); }
+.dev-riga .apri { width: 1%; padding-right: 0; }
+.expand {
+  background: none; border: none; color: var(--faint); cursor: pointer;
+  font-family: var(--mono); font-size: 12px; padding: 2px 4px; line-height: 1;
+  transition: transform .18s, color .15s;
+}
+.expand:hover { color: var(--teal); }
+.expand.open { transform: rotate(90deg); color: var(--teal); }
+.dev-scheda:hover > td { background: transparent; }
+.dev-scheda > td { background: var(--bg-2); padding: 0; }
+.dev-card { padding: 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+
+/* Porte come chip, in tabella e nella scheda. */
+.dev-ports { display: flex; flex-wrap: wrap; gap: 4px;
+  font-family: var(--mono); font-size: 11px; color: var(--muted); }
+.dev-ports span { background: var(--panel-2); border-radius: 4px; padding: 0 5px; }
+.dev-ports .piu { color: var(--faint); cursor: help; }
+
+/* ── Interfacce di rete di un host ──────────────────────────────
+   Una card per interfaccia. Il dato arriva dai facts SSH, quindi esiste solo
+   per gli host configurati: dove manca la scheda lo dice. */
+.iface-testa { font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--muted); }
+.iface-testa .muted { font-weight: 400; text-transform: none; letter-spacing: 0; }
+.iface-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr));
+  gap: 8px; margin-top: 8px; }
+.iface-card { background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 9px 11px;
+  display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.iface-card.giu { opacity: .55; }
+.iface-testa-card { display: flex; align-items: center; gap: 6px; justify-content: space-between; }
+.iface-nome { font-family: var(--mono); font-weight: 600; font-size: 12.5px;
+  min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.iface-meta { font-family: var(--mono); font-size: 10.5px; line-height: 1.6; }
+.iface-meta .lbl { color: var(--faint); margin-right: 6px; }
+.iface-meta .val { color: var(--muted); word-break: break-all; }
+
+.detail-grid { border-top: 1px solid var(--border); padding-top: 10px; }
+.detail-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 2px 22px; }
+.kv { display: flex; justify-content: space-between; gap: 10px; padding: 4px 0;
+  border-bottom: 1px solid var(--border); font-size: 13px; }
+.kv > .muted { white-space: nowrap; }
+
+.modal-ov { position: fixed; inset: 0; background: var(--velo);
+  display: flex; align-items: center; justify-content: center; z-index: 50; }
+.modal { background: var(--panel); border: 1px solid var(--border-2); border-radius: var(--radius);
+  padding: 20px; width: 420px; max-width: 92vw; }
+.modal h3 { margin: 0 0 14px; font-size: 15px; }
+.modal label { display: block; margin-bottom: 11px; font-size: 12px; color: var(--muted); }
+.modal label input, .modal label select { display: block; width: 100%; margin-top: 4px;
+  background: var(--bg-2); border: 1px solid var(--border-2); color: var(--text);
+  border-radius: 7px; padding: 8px 10px; font-size: 13px; font-family: var(--sans); }
+/* Le caselle di spunta non sono campi di testo: la regola qui sopra le stirava
+   a tutta larghezza con dentro il padding di un input. */
+.modal label input[type=checkbox] { display: inline-block; width: auto; flex: none;
+  margin: 0; padding: 0; }
+.modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 8px; }
+
+/* ── Editor configurazione ──────────────────────────────────────── */
+.config-editor {
+  width: 100%; min-height: 460px; resize: vertical;
+  background: var(--code-bg); color: var(--text); border: 1px solid var(--border-2);
+  border-radius: var(--radius); padding: 12px; font-family: var(--mono); font-size: 12.5px;
+  line-height: 1.5; tab-size: 2;
+}
+.config-editor:focus { outline: none; border-color: var(--teal); }
+.cfg-note { padding: 9px 12px; border-radius: 8px; font-size: 13px; margin-top: 10px;
+  background: var(--panel-2); border: 1px solid var(--border-2); }
+.cfg-note.ok  { color: var(--green);  border-color: var(--bd-green); }
+.cfg-note.err { color: var(--red);    border-color: var(--bd-red); }
+/* Neon: l'alone. Su nero pieno un bordo da un pixel non fa un confine, e i
+   pannelli galleggiano. Sta solo qui perche' e' l'unico tema che lo chiede. */
+[data-tema="neon"] .card,
+[data-tema="neon"] .modal,
+[data-tema="neon"] .toast {
+  box-shadow: 0 0 14px color-mix(in srgb, var(--border) 45%, transparent);
+}
+[data-tema="neon"] .kpi {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--border-2) 55%, transparent);
+}
+[data-tema="neon"] .brand .dot { box-shadow: 0 0 14px var(--teal); }
+
+/* I titoli delle card in tinta e accesi: sono le etichette della pagina,
+   non testo da leggere a lungo. Sul testo corrente l'alone non va: un
+   paragrafo con il text-shadow diventa illeggibile. */
+[data-tema="neon"] .card h3 {
+  color: var(--teal);
+  text-shadow: 0 0 9px color-mix(in srgb, var(--teal) 60%, transparent);
+}
+/* I numeri grandi: l'alone segue il colore che il KPI ha gia' (verde,
+   arancio, rosso), quindi currentColor e non un token fisso. */
+[data-tema="neon"] .kpi .val {
+  text-shadow: 0 0 10px color-mix(in srgb, currentColor 50%, transparent);
+}
+[data-tema="neon"] .rates .rate {
+  text-shadow: 0 0 8px color-mix(in srgb, currentColor 40%, transparent);
+}
+[data-tema="neon"] .brand {
+  color: var(--teal);
+  text-shadow: 0 0 10px color-mix(in srgb, var(--teal) 55%, transparent);
+}
+
+/* ── Selettore dei temi (Impostazioni) ────────────────────────────
+   Ogni pulsante porta il proprio `data-tema`: le variabili di quel tema valgono
+   dentro di lui, quindi il pulsante e' l'anteprima di se stesso. */
+.temi { display: grid; grid-template-columns: repeat(auto-fill, minmax(196px, 1fr)); gap: 10px; }
+.tema-scelta {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 7px;
+  text-align: left; cursor: pointer; padding: 11px 12px; border-radius: var(--radius);
+  background: var(--panel); color: var(--text); border: 1px solid var(--border-2);
+  font-family: var(--sans); font-size: 13px; line-height: 1.4;
+}
+.tema-scelta:hover { border-color: var(--teal); }
+.tema-scelta.attivo { border-color: var(--teal); box-shadow: inset 0 0 0 1px var(--teal); }
+.tema-campione { display: flex; gap: 4px; }
+.tema-campione i { width: 20px; height: 13px; border-radius: 3px; display: block;
+  border: 1px solid var(--border); }
+.tema-riga { display: flex; align-items: baseline; gap: 8px; width: 100%; }
+.tema-nome { font-weight: 600; }
+.tema-riga .tema-uso { margin-left: auto; font-size: 11px; color: var(--teal);
+  font-family: var(--mono); }
+.tema-nota { font-size: 11.5px; color: var(--muted); }
+
+code { background: var(--panel-2); padding: 1px 5px; border-radius: 5px; font-family: var(--mono); font-size: 12px; }
+
+/* ── Login ───────────────────────────────────────────────────────── */
+.login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.login { width: 340px; max-width: 92vw; }
+.login label { display: block; margin-bottom: 11px; font-size: 12px; color: var(--muted); }
+.login label input { display: block; width: 100%; margin-top: 4px;
+  background: var(--bg-2); border: 1px solid var(--border-2); color: var(--text);
+  border-radius: 7px; padding: 9px 11px; font-size: 14px; }
+#logout:hover { color: var(--teal); border-color: var(--teal); }
+
+/* ── Terminale SSH ───────────────────────────────────────────────── */
+/* Il contenitore scrolla, il <pre> dentro contiene scrollback + schermo.
+   La cella di misura (.term-probe) e' fuori dal flusso: serve solo a sapere
+   quanto e' larga una colonna per calcolare righe/colonne reali. */
+/* Il terminale resta scuro in TUTTI i temi, sfondo e sedici colori ANSI
+   (quelli stanno in terminal.js): un terminale e' un terminale, e riverniciarlo
+   di chiaro vorrebbe dire inventare una tavolozza ANSI per ogni tema. */
+.term { position: relative; background: #0c0f16; border-radius: var(--radius);
+  height: 62vh; min-height: 320px; overflow: auto; padding: 6px 8px; outline: none; }
+.term:focus { box-shadow: inset 0 0 0 1px var(--teal); }
+.term-screen { margin: 0; font-family: var(--mono); font-size: 12.5px; line-height: 1.25;
+  color: #c8cfdc; white-space: pre; tab-size: 8; }
+.term-probe { position: absolute; visibility: hidden; top: 0; left: 0;
+  font-family: var(--mono); font-size: 12.5px; line-height: 1.25; white-space: pre; }
+td.err, .err { color: var(--red); }
+
+/* ===================================================================
+   Mobile
+   Sotto i 760px la sidebar non ci sta di fianco al contenuto: diventa un
+   drawer che scorre da sinistra, aperto dall'hamburger nell'header. Prima
+   veniva solo nascosta, e senza un modo per aprirla si restava bloccati
+   sulla pagina di partenza.
+   =================================================================== */
+@media (max-width: 760px) {
+  .app { grid-template-columns: 1fr; }
+
+  .sidebar {
+    position: fixed; top: 0; left: 0; bottom: 0; height: 100%;
+    width: 260px; max-width: 82vw; z-index: 40;
+    transform: translateX(-100%); transition: transform .18s ease;
+    box-shadow: 2px 0 18px rgba(0,0,0,.45);
+  }
+  body.nav-open .sidebar { transform: none; }
+  /* Con il drawer aperto lo sfondo non deve scorrere sotto le dita. */
+  body.nav-open { overflow: hidden; }
+
+  .nav-scrim {
+    display: block; position: fixed; inset: 0; z-index: 35;
+    background: var(--velo);
+  }
+  .nav-scrim[hidden] { display: none; }
+  /* Voci piu' alte: si toccano col pollice, non col mouse. */
+  .nav a { padding: 12px; }
+
+  .navbtn { display: inline-flex; align-items: center; justify-content: center; }
+
+  .topbar { flex-wrap: wrap; gap: 8px; padding: 10px 12px; }
+  .topbar h1 { flex: 1 1 auto; min-width: 0; font-size: 15px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .topbar .spacer { flex: 0 0 0; }
+  .topbar .pill { font-size: 11px; padding: 3px 8px; }
+
+  .content { padding: 14px 12px; }
+  .sec-banner { padding: 10px 12px; }
+
+  /* Da telefono i 380px del desktop uscirebbero dallo schermo: le notifiche
+     prendono tutta la larghezza utile, restando in basso. */
+  .toasts { left: 12px; right: 12px; bottom: 12px; max-width: none; }
+
+  /* I riquadri KPI sono piccoli: due per riga, invece di quattro schermate da
+     scorrere. Le griglie di card (cols-2) restano a colonna singola. */
+  .grid.cols-4, .grid.cols-3 { grid-template-columns: repeat(2,1fr) !important; }
+  .kpi .val { font-size: 24px; }
+  .kpi .val.testo { font-size: 18px; }
+  .rates .rate { font-size: 15px; }
+
+  /* Tabelle: nessuna colonna viene nascosta (su un telefono servono gli
+     stessi dati). La tabella tiene la sua larghezza naturale e a scorrere
+     in orizzontale e' la card che la contiene, non la pagina. */
+  .card { overflow-x: auto; }
+  table { width: auto; min-width: 100%; }
+  .detail-grid { grid-template-columns: 1fr; }
+
+  /* Mappa: piu' bassa, e la legenda passa sotto invece di coprire i nodi. */
+  #lanmap { height: 340px; }
+  .map-legend { position: static; padding: 8px 10px 10px; }
+
+  /* Form e controlli: i campi si adattano alla riga invece di sforare
+     (le larghezze minime sono scritte inline nel markup, da qui l'!important)
+     e i 16px evitano lo zoom automatico di Safari sul campo a fuoco. */
+  .controls { gap: 8px; }
+  .controls > input[type=text], .controls > select { flex: 1 1 180px; }
+  input[type=text], input[type=password], input[type=number], select, textarea {
+    min-width: 0 !important; max-width: 100%; font-size: 16px;
+  }
+  button.btn, .seg button { padding: 9px 13px; font-size: 13px; }
+  .iconbtn { width: 34px; height: 32px; font-size: 15px; }
+  .subtabs-bar #mon-eta { margin-left: 0; }
+
+  .modal { width: 100%; max-height: 88vh; overflow-y: auto; }
+  /* Nessun font-size qui: lascia valere i 16px della regola sopra, altrimenti
+     Safari zooma sull'editor a fuoco e non torna piu' indietro. Le righe
+     lunghe vanno a capo da sole, come in ogni textarea. */
+  .config-editor { min-height: 320px; }
+  .logbox { max-height: 56vh; font-size: 12px; }
+
+  /* Terminale: carattere piu' piccolo = piu' colonne reali su schermo
+     stretto (fit() misura la cella dal CSS). */
+  .term { height: 54vh; min-height: 260px; }
+  .term-screen, .term-probe { font-size: 11px; }
+}
+
+/* Chi ha chiesto meno animazioni non vede scorrere il drawer. */
+@media (prefers-reduced-motion: reduce) { .sidebar { transition: none; } }

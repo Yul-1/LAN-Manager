@@ -1,0 +1,41 @@
+# Riduce il contesto di build ed evita di includere segreti/artefatti.
+
+# Python
+**/.venv
+**/venv
+**/__pycache__
+**/*.py[cod]
+**/*.egg-info
+**/.pytest_cache
+
+# Config reale e segreti: montati a runtime, MAI nell'immagine
+config/*.yaml
+config/secrets.env
+config/.vault_pass
+config/*.bak
+config/*.bak.yaml
+ssh/
+*.pem
+*.key
+*.env
+
+# Artefatti di export
+dist/
+*.tar.gz
+
+# Dati rete reali
+*.xlsx
+
+# Suite di test: il Dockerfile fa COPY backend/, che se la porterebbe dentro.
+# Le dipendenze di test non entrano comunque (si installa solo requirements.txt).
+backend/tests/
+backend/requirements-dev.txt
+backend/pytest.ini
+frontend/tests/
+
+# VCS / tooling / docs non necessari nell'immagine
+.git
+.gitignore
+.claude/
+*.md
+TODO.md

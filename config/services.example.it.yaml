@@ -1,0 +1,119 @@
+# ═══════════════════════════════════════════════════════════════════
+#  services.example.it.yaml — Catalogo servizi da monitorare (italiano)
+#
+#  COME USARLO:
+#    cp config/services.example.it.yaml config/services.yaml
+#
+#  LANMng monitora quattro tipi di "servizio". Aggiungerne di nuovi e'
+#  semplice: copia un blocco nella sezione giusta e compila i campi.
+#
+#    1) docker   -> i container Docker vengono rilevati AUTOMATICAMENTE.
+#                   Qui elenchi solo quelli a cui vuoi dare un nome
+#                   leggibile / un URL / segnalarli come "importanti".
+#    2) systemd  -> unit systemd di un host, lette via SSH.
+#    3) windows  -> servizi di un PC Windows della rete, letti via SSH.
+#    4) http     -> healthcheck di endpoint web o porte TCP.
+#
+#  In tutte le sezioni il campo facoltativo "dashboard" decide chi compare
+#  fra i "servizi in evidenza" della pagina Dashboard. Si gestisce anche
+#  dalla UI (Monitoraggio -> modifica -> "mostra in dashboard"). Quando lo
+#  si omette vale la regola storica:
+#    docker  -> si'
+#    systemd -> quanto vale "critical"
+#    windows -> no
+#    http    -> no
+#
+#  Gli indirizzi qui sotto sono intervalli di documentazione (RFC 5737):
+#  sostituiscili con i tuoi. La versione inglese e' services.example.yaml.
+# ═══════════════════════════════════════════════════════════════════
+
+# ── 1) Container Docker importanti (etichette opzionali) ──────────
+#  I container sono scoperti da soli; questo blocco serve solo per
+#  arricchire nome/URL e marcarli "pinned" (mostrati in cima).
+docker:
+  pinned:
+    - name: "portainer"        # corrisponde al nome del container
+      label: "Portainer"
+      url: "http://198.51.100.10:9000"
+      dashboard: true          # in evidenza sulla Dashboard (l'URL la rende cliccabile)
+    - name: "lanmng-api"
+      label: "LANMng API"
+      url: ""
+      dashboard: false
+
+# ── 2) Unit systemd dell'host ─────────────────────────────────────
+#  Elenca le unit da controllare. Lo stato (active/inactive/failed) viene
+#  letto dall'host via SSH. "critical: true" -> alza un alert se la unit
+#  non e' attiva.
+systemd:
+  units:
+    - unit: "docker.service"
+      label: "Docker Engine"
+      critical: true
+      dashboard: true
+    - unit: "ssh.service"
+      label: "SSH"
+      critical: true
+    - unit: "wg-quick@wgclient.service"
+      label: "WireGuard"
+      critical: false
+    - unit: "systemd-resolved.service"
+      label: "DNS resolver"
+      critical: false
+      dashboard: false         # monitorato, ma non in prima pagina
+
+# ── 3) Servizi Windows di un PC della rete ────────────────────────
+#  Lo stato si legge via SSH con PowerShell, come systemd si legge con
+#  systemctl. Due regole diverse dalle altre sezioni:
+#
+#    - "host" e' OBBLIGATORIO: un servizio Windows non esiste sulla
+#      macchina Linux che ospita LANMng, quindi non c'e' un host di
+#      default da cui ripiegare. L'host, con il suo utente Windows, va
+#      elencato in config.yaml sotto discovery.ssh.hosts.
+#    - "name" e' il nome BREVE del servizio (quello di `sc query`), non
+#      il nome visualizzato. Niente caratteri jolly * o ?: PowerShell li
+#      espanderebbe agganciando servizi a caso.
+#
+#  Un servizio che su quell'host non e' installato non e' un guasto: la
+#  dashboard scrive "non installato", che e' un'altra cosa da "fermo".
+windows:
+  services:
+    - name: "sshd"             # nome breve, come in `sc query`
+      label: "OpenSSH Server"
+      host: "192.0.2.12"       # il PC Windows, elencato in discovery.ssh.hosts
+      critical: false          # true -> alza un alert se non e' in esecuzione
+      dashboard: false
+
+    # - name: "Spooler"
+    #   label: "Coda di stampa"
+    #   host: "192.0.2.12"
+
+# ── 4) Healthcheck HTTP / porte TCP ───────────────────────────────
+#  type: http -> GET sull'URL, ok se status in expect_status
+#  type: tcp  -> prova ad aprire host:port, ok se la connessione riesce
+http:
+  checks:
+    - name: "Amministrazione router"
+      type: "http"
+      url: "http://192.0.2.1"
+      expect_status: [200, 401, 403]   # molti router rispondono 403 senza login: sono "vivi"
+      timeout: 5
+      dashboard: true          # in evidenza: l'URL diventa il link per aprirlo
+
+    - name: "Portainer"
+      type: "http"
+      url: "http://198.51.100.10:9000"
+      expect_status: [200]
+      timeout: 5
+
+    - name: "Relay WireGuard"
+      type: "tcp"
+      host: "203.0.113.10"
+      port: 51820
+      timeout: 5
+
+    - name: "DNS interno"
+      type: "tcp"
+      host: "192.0.2.1"
+      port: 53
+      timeout: 3

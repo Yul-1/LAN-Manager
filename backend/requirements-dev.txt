@@ -1,0 +1,10 @@
+# LANMng backend — dipendenze di SVILUPPO (suite di test).
+# NON entrano nell'immagine di produzione: il Dockerfile installa solo
+# requirements.txt, e .dockerignore esclude questo file e backend/tests/.
+#
+# Install:  backend/.venv/bin/pip install -r backend/requirements-dev.txt
+
+-r requirements.txt
+
+pytest==8.3.4
+pytest-asyncio==0.24.0

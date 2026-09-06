@@ -1,0 +1,14 @@
+# Cattura reale di 'systemctl show <unit> -p LoadState -p ActiveState -p SubState',
+# le tre proprieta' che systemd_monitor chiede. Tre casi: attiva, inattiva, inesistente.
+## docker.service (attiva)
+LoadState=loaded
+ActiveState=active
+SubState=running
+## cron.service (variabile)
+LoadState=loaded
+ActiveState=active
+SubState=running
+## inesistente.service (non caricata)
+LoadState=not-found
+ActiveState=inactive
+SubState=dead

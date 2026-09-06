@@ -1,0 +1,119 @@
+# ═══════════════════════════════════════════════════════════════════
+#  services.example.yaml — Catalogue of services to monitor
+#
+#  HOW TO USE IT:
+#    cp config/services.example.yaml config/services.yaml
+#
+#  LANMng monitors four kinds of "service". Adding one is easy: copy a
+#  block into the right section and fill in the fields.
+#
+#    1) docker   -> Docker containers are detected AUTOMATICALLY.
+#                   Here you only list the ones you want to give a
+#                   readable name / a URL / mark as important.
+#    2) systemd  -> systemd units of a host, read over SSH.
+#    3) windows  -> services of a Windows PC on the network, read over SSH.
+#    4) http     -> health checks of web endpoints or TCP ports.
+#
+#  In every section the optional "dashboard" field decides which services
+#  appear among the "featured services" on the Dashboard page. You can
+#  also manage it from the UI (Monitoring -> edit -> "show on dashboard").
+#  When omitted the historical rule applies:
+#    docker  -> yes
+#    systemd -> whatever "critical" is
+#    windows -> no
+#    http    -> no
+#
+#  The addresses below are RFC 5737 documentation ranges: replace them
+#  with your own. An Italian copy of this file is services.example.it.yaml.
+# ═══════════════════════════════════════════════════════════════════
+
+# ── 1) Important Docker containers (optional labels) ──────────────
+#  Containers are discovered on their own; this block only exists to
+#  enrich name/URL and to mark them "pinned" (shown at the top).
+docker:
+  pinned:
+    - name: "portainer"        # matches the container name
+      label: "Portainer"
+      url: "http://198.51.100.10:9000"
+      dashboard: true          # featured on the Dashboard (the URL makes it clickable)
+    - name: "lanmng-api"
+      label: "LANMng API"
+      url: ""
+      dashboard: false
+
+# ── 2) systemd units of the host ──────────────────────────────────
+#  List the units to check. Their state (active/inactive/failed) is read
+#  from the host over SSH. "critical: true" -> raises an alert when the
+#  unit is not active.
+systemd:
+  units:
+    - unit: "docker.service"
+      label: "Docker Engine"
+      critical: true
+      dashboard: true
+    - unit: "ssh.service"
+      label: "SSH"
+      critical: true
+    - unit: "wg-quick@wgclient.service"
+      label: "WireGuard"
+      critical: false
+    - unit: "systemd-resolved.service"
+      label: "DNS resolver"
+      critical: false
+      dashboard: false         # monitored, but not on the front page
+
+# ── 3) Windows services of a PC on the network ────────────────────
+#  Their state is read over SSH with PowerShell, the same way systemd is
+#  read with systemctl. Two rules differ from the other sections:
+#
+#    - "host" is MANDATORY: a Windows service does not exist on the Linux
+#      machine hosting LANMng, so there is no default host to fall back
+#      to. The host, with its Windows user, must be listed in config.yaml
+#      under discovery.ssh.hosts.
+#    - "name" is the SHORT service name (the one from `sc query`), not the
+#      display name. No * or ? wildcards: PowerShell would expand them and
+#      pick up services at random.
+#
+#  A service that is not installed on that host is not a fault: the
+#  dashboard says "not installed", which is a different thing from "stopped".
+windows:
+  services:
+    - name: "sshd"             # short name, as in `sc query`
+      label: "OpenSSH Server"
+      host: "192.0.2.12"       # the Windows PC, listed in discovery.ssh.hosts
+      critical: false          # true -> raises an alert when it is not running
+      dashboard: false
+
+    # - name: "Spooler"
+    #   label: "Print queue"
+    #   host: "192.0.2.12"
+
+# ── 4) HTTP / TCP port health checks ──────────────────────────────
+#  type: http -> GET on the URL, ok if the status is in expect_status
+#  type: tcp  -> tries to open host:port, ok if the connection succeeds
+http:
+  checks:
+    - name: "Router admin"
+      type: "http"
+      url: "http://192.0.2.1"
+      expect_status: [200, 401, 403]   # many routers answer 403 without a login: still "alive"
+      timeout: 5
+      dashboard: true          # featured: the URL becomes the link to open it
+
+    - name: "Portainer"
+      type: "http"
+      url: "http://198.51.100.10:9000"
+      expect_status: [200]
+      timeout: 5
+
+    - name: "WireGuard relay"
+      type: "tcp"
+      host: "203.0.113.10"
+      port: 51820
+      timeout: 5
+
+    - name: "Internal DNS"
+      type: "tcp"
+      host: "192.0.2.1"
+      port: 53
+      timeout: 3

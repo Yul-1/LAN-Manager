@@ -1,0 +1,77 @@
+# LANMng — stack di esecuzione (backend + nginx).
+# Le immagini si caricano da tar (docker load): qui NIENTE build.
+# Avvio:  TAG=0.1.0 docker compose up -d   (oppure metti TAG in un file .env)
+#
+# Layout atteso accanto a questo file:
+#   ./config/   config.yaml, secrets.env, devices.yaml  (montato in rw)
+#   ./ssh/      id_ed25519                               (chiave router, ro)
+
+services:
+  backend:
+    image: lanmng-backend:${TAG:-latest}
+    # Con `image` e `build` insieme docker compose costruisce SOLO se l'immagine
+    # manca: dopo un `docker load` continua a usare quella caricata. Cosi'
+    # `docker compose up --build` funziona appena clonato il repo, senza togliere
+    # il percorso "immagini da tar" usato dove non c'e' internet.
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: lanmng-backend
+    restart: unless-stopped
+    # Host network: la discovery (nmap/ARP) deve vedere le subnet della LAN
+    # e il backend resta in ascolto solo su 127.0.0.1:8000.
+    network_mode: host
+    # Vedi i commenti estesi in deploy/docker-compose.host-nginx.yml: si scarta
+    # tutto il set di default e si tiene solo cio' che serve al ping-scan nmap
+    # (NET_ADMIN inclusa perche' il setcap del binario la pretende all'exec).
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    # no-new-privileges NON abilitato: renderebbe inerti le file-capability di
+    # nmap e ping. Il rischio che mitiga e' gia' chiuso dal rootfs read-only.
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    mem_limit: 512m
+    cpus: 2.0
+    pids_limit: 300
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    volumes:
+      - ./config:/app/config:rw                       # editabile da UI -> rw
+      - ./ssh:/app/ssh:ro                             # chiave SSH router (ro)
+      - /var/run/docker.sock:/var/run/docker.sock:ro  # monitor Docker locale (ro)
+      - /etc/wireguard:/etc/wireguard:ro              # stato WireGuard (ro)
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://127.0.0.1:8000/health').status==200 else sys.exit(1)"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  nginx:
+    image: lanmng-nginx:${TAG:-latest}
+    build:
+      context: .
+      dockerfile: nginx/Dockerfile
+    container_name: lanmng-nginx
+    restart: unless-stopped
+    # Host network anche per nginx: cosi' raggiunge il backend su 127.0.0.1:8000
+    # ed espone la dashboard sulla porta 80 dell'host.
+    network_mode: host
+    # Qui nessun setcap in gioco (nginx usa NET_BIND_SERVICE dal set di default),
+    # quindi la flag e' sicura: nessun exec potra' guadagnare privilegi nuovi.
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    depends_on:
+      - backend

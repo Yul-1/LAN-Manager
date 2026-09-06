@@ -1,0 +1,117 @@
+# ═══════════════════════════════════════════════════════════════════
+#  devices.example.it.yaml — Catalogo manuale dispositivi (versione italiana)
+#
+#  COME USARLO:
+#    cp config/devices.example.it.yaml config/devices.yaml
+#
+#  A cosa serve:
+#    L'auto-discovery trova i dispositivi da sola (DHCP/ARP dal router,
+#    ping sweep, nmap, reverse DNS, SSH, SNMP). Questo catalogo aggiunge
+#    cio' che una scansione non puo' sapere: un NOME leggibile, il tipo,
+#    le note, l'URL di un pannello. Si gestisce tutto anche dalla pagina
+#    Dispositivi: questo file e' quello che quella pagina scrive.
+#
+#  L'IDENTITA' E' L'INDIRIZZO, NON IL MAC:
+#    Una entry si identifica con il suo `ip`. Il `mac` e' facoltativo e
+#    puramente descrittivo, e PUO' ripetersi fra entry diverse: una VM in
+#    bridge su Wi-Fi presenta il MAC della scheda dell'host, quindi lo
+#    stesso MAC puo' appartenere a macchine diverse. Solo una entry
+#    senza `ip` (dispositivo noto ma senza indirizzo fisso) si identifica
+#    con il `mac`.
+#
+#  COME AGGIUNGERE UN DISPOSITIVO:
+#    Copia un blocco "- ip: ..." e compila i campi. L'indirizzo lo trovi
+#    nella pagina Dispositivi della dashboard.
+#
+#  Campi:
+#    ip       identita' della entry (serve almeno ip oppure mac)
+#    mac      facoltativo, descrittivo; identita' solo per le entry senza ip
+#    name     nome leggibile mostrato in dashboard
+#    type     router | desktop | laptop | server | vm | mobile | cloud | ap | unknown
+#    os       sistema operativo (testo libero)
+#    services lista breve di servizi noti (solo etichette informative)
+#    notes    note libere
+#    url      link al pannello del dispositivo (facoltativo)
+#
+#  Gli indirizzi qui sotto sono intervalli di documentazione (RFC 5737):
+#  sostituiscili con i tuoi. La versione inglese e' devices.example.yaml.
+# ═══════════════════════════════════════════════════════════════════
+
+devices:
+  - ip: "192.0.2.1"
+    mac: "aa:bb:cc:dd:ee:01"
+    name: "gateway"
+    type: "router"
+    os: "OpenWrt"
+    services: ["dnsmasq", "WireGuard"]
+    notes: "Gateway della rete. E' anche il server DHCP e DNS."
+    url: "http://192.0.2.1"
+
+  - ip: "198.51.100.10"
+    mac: "aa:bb:cc:dd:ee:02"
+    name: "homeserver"
+    type: "server"
+    os: "Ubuntu Server"
+    services: ["Docker", "SSH", "LANMng"]
+    notes: "L'host su cui gira LANMng."
+    url: ""
+
+  - ip: "192.0.2.10"
+    mac: "aa:bb:cc:dd:ee:03"
+    name: "workstation"
+    type: "desktop"
+    os: "Windows 11"
+    services: []
+    notes: "Ospita le macchine virtuali qui sotto."
+    url: ""
+
+  # Stessa macchina fisica della entry sopra, secondo indirizzo: una scheda
+  # cablata e una wireless. Due indirizzi sono due entry, ognuna con il suo
+  # nome — ed e' cosi' che si distinguono in dashboard e sulla mappa.
+  - ip: "192.0.2.11"
+    mac: "aa:bb:cc:dd:ee:04"
+    name: "workstation-wifi"
+    type: "desktop"
+    os: "Windows 11"
+    services: []
+    notes: "Scheda wireless di workstation."
+    url: ""
+
+  - ip: "192.0.2.20"
+    mac: "aa:bb:cc:dd:ee:05"
+    name: "laptop"
+    type: "laptop"
+    os: "macOS"
+    services: []
+    notes: ""
+    url: ""
+
+  # Una macchina virtuale in bridge sulla LAN. Guarda il MAC: e' lo stesso
+  # della scheda del suo host, ed e' esattamente il motivo per cui il MAC
+  # non puo' fare da identita'.
+  - ip: "192.0.2.30"
+    mac: "aa:bb:cc:dd:ee:03"
+    name: "build-vm"
+    type: "vm"
+    os: "Debian"
+    services: []
+    notes: "VM su workstation. In bridge: mostra il MAC della scheda dell'host."
+    url: ""
+
+  # Un dispositivo senza indirizzo fisso: qui il MAC e' l'identita'. Utile per
+  # qualcosa che gira (un telefono, un portatile in DHCP) a cui vuoi comunque
+  # dare un nome.
+  - mac: "aa:bb:cc:dd:ee:06"
+    name: "telefono"
+    type: "mobile"
+    os: "Android"
+    services: []
+    notes: "Nessun indirizzo fisso: identificato dal MAC."
+    url: ""
+
+# Dispositivi da tenere fuori dalla dashboard. La discovery continuera' a
+# trovarli, semplicemente non vengono mostrati. Si usa l'indirizzo che
+# identifica la entry (l'ip, o il mac per le entry che non ce l'hanno).
+hidden: []
+  # - "192.0.2.50"
+  # - "aa:bb:cc:dd:ee:07"

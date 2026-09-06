@@ -1,0 +1,114 @@
+# ═══════════════════════════════════════════════════════════════════
+#  devices.example.yaml — Manual LAN device catalogue
+#
+#  HOW TO USE IT:
+#    cp config/devices.example.yaml config/devices.yaml
+#
+#  What it is for:
+#    Auto-discovery finds devices on its own (DHCP/ARP from the router,
+#    ping sweep, nmap, reverse DNS, SSH, SNMP). This catalogue adds what
+#    a scan cannot know: a readable NAME, the type, notes, a panel URL.
+#    You can also manage all of it from the Devices page - this file is
+#    what that page writes.
+#
+#  IDENTITY IS THE ADDRESS, NOT THE MAC:
+#    An entry is identified by its `ip`. The `mac` is optional and purely
+#    descriptive, and it MAY repeat across entries: a VM bridged over
+#    Wi-Fi presents the MAC of the host's card, so the same MAC can
+#    belong to different machines. Only an entry with no `ip` at all
+#    (a known device without a fixed address) is identified by its `mac`.
+#
+#  HOW TO ADD A DEVICE:
+#    Copy a "- ip: ..." block and fill in the fields. You will find the
+#    address in the dashboard's Devices page.
+#
+#  Fields:
+#    ip       identity of the entry (an entry needs at least ip or mac)
+#    mac      optional, descriptive; the identity only for entries with no ip
+#    name     readable name shown in the dashboard
+#    type     router | desktop | laptop | server | vm | mobile | cloud | ap | unknown
+#    os       operating system (free text)
+#    services short list of known services (informational labels only)
+#    notes    free notes
+#    url      link to the device's own panel (optional)
+#
+#  The addresses below are RFC 5737 documentation ranges: replace them
+#  with your own. An Italian copy of this file is devices.example.it.yaml.
+# ═══════════════════════════════════════════════════════════════════
+
+devices:
+  - ip: "192.0.2.1"
+    mac: "aa:bb:cc:dd:ee:01"
+    name: "gateway"
+    type: "router"
+    os: "OpenWrt"
+    services: ["dnsmasq", "WireGuard"]
+    notes: "Network gateway. Also the DHCP and DNS server."
+    url: "http://192.0.2.1"
+
+  - ip: "198.51.100.10"
+    mac: "aa:bb:cc:dd:ee:02"
+    name: "homeserver"
+    type: "server"
+    os: "Ubuntu Server"
+    services: ["Docker", "SSH", "LANMng"]
+    notes: "The host running LANMng."
+    url: ""
+
+  - ip: "192.0.2.10"
+    mac: "aa:bb:cc:dd:ee:03"
+    name: "workstation"
+    type: "desktop"
+    os: "Windows 11"
+    services: []
+    notes: "Hosts the virtual machines below."
+    url: ""
+
+  # Same physical machine as the entry above, second address: a wired and a
+  # wireless card. Two addresses are two entries, each with its own name -
+  # that is what makes them tellable apart in the dashboard and on the map.
+  - ip: "192.0.2.11"
+    mac: "aa:bb:cc:dd:ee:04"
+    name: "workstation-wifi"
+    type: "desktop"
+    os: "Windows 11"
+    services: []
+    notes: "Wireless card of workstation."
+    url: ""
+
+  - ip: "192.0.2.20"
+    mac: "aa:bb:cc:dd:ee:05"
+    name: "laptop"
+    type: "laptop"
+    os: "macOS"
+    services: []
+    notes: ""
+    url: ""
+
+  # A virtual machine bridged onto the LAN. Note the MAC: it is the same as
+  # its host's card, and that is exactly why the MAC cannot be the identity.
+  - ip: "192.0.2.30"
+    mac: "aa:bb:cc:dd:ee:03"
+    name: "build-vm"
+    type: "vm"
+    os: "Debian"
+    services: []
+    notes: "VM on workstation. Bridged: it shows the host card's MAC."
+    url: ""
+
+  # A device with no fixed address: here the MAC is the identity. Useful for
+  # something that roams (a phone, a laptop on DHCP) that you still want named.
+  - mac: "aa:bb:cc:dd:ee:06"
+    name: "phone"
+    type: "mobile"
+    os: "Android"
+    services: []
+    notes: "No fixed address: identified by MAC."
+    url: ""
+
+# Devices to keep out of the dashboard. Discovery will keep finding them;
+# they simply are not shown. Use the address that identifies the entry
+# (the ip, or the mac for entries without one).
+hidden: []
+  # - "192.0.2.50"
+  # - "aa:bb:cc:dd:ee:07"

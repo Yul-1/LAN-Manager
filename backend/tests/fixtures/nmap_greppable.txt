@@ -1,0 +1,16 @@
+# Cattura reale di `nmap -T4 -oG - -n -sT -p <porte>` (nmap 7.94SVN), con gli
+# indirizzi riscritti sulle reti di documentazione (RFC 5737): il repo non deve
+# contenere la topologia vera. Formato, spaziature e campi sono quelli originali.
+#
+# Le ultime tre righe sono aggiunte a mano per coprire i rami che la cattura non
+# conteneva: host spento, hostname risolto, MAC con vendor, stringa OS.
+# Nmap 7.94SVN scan initiated Wed Aug 26 19:28:32 2026 as: nmap -T4 -oG - -n -sT -p 22,53,80,443,3000,8000,8080,9000,9090,51820 192.0.2.0/24
+Host: 192.0.2.1 ()	Status: Up
+Host: 192.0.2.1 ()	Ports: 22/open/tcp//ssh///, 53/open/tcp//domain///, 80/open/tcp//http///, 443/open/tcp//https///, 3000/closed/tcp//ppp///, 8000/closed/tcp//http-alt///, 8080/closed/tcp//http-proxy///, 9000/closed/tcp//cslistener///, 9090/closed/tcp//zeus-admin///, 51820/closed/tcp/////
+Host: 192.0.2.30 ()	Status: Up
+Host: 192.0.2.30 ()	Ports: 22/open/tcp//ssh///, 53/closed/tcp//domain///, 80/open/tcp//http///, 443/open/tcp//https///, 3000/closed/tcp//ppp///, 8000/closed/tcp//http-alt///, 8080/closed/tcp//http-proxy///, 9000/closed/tcp//cslistener///, 9090/closed/tcp//zeus-admin///, 51820/closed/tcp/////
+Host: 192.0.2.99 ()	Status: Down
+Host: 192.0.2.50 (stampante.lan)	Status: Up
+Host: 192.0.2.51 ()	Status: Up	MAC: AA:BB:CC:DD:EE:FF (Esempio Networks)
+Host: 192.0.2.52 ()	Ports: 22/open/tcp//ssh///	OS: Linux 5.X	Seq Index: 260
+# Nmap done at Wed Aug 26 19:28:32 2026 -- 4 IP addresses (3 hosts up) scanned in 0.05 seconds
