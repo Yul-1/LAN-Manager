@@ -18,8 +18,8 @@ fi
 sed -i -E "s/\.(js|css)\?v=[^\"']*/.\1?v=${VERSION}/g" frontend/index.html
 echo ">> Asset in index.html marcati come ?v=${VERSION}"
 
-BACKEND_IMG="lanmng-backend"
-NGINX_IMG="lanmng-nginx"
+BACKEND_IMG="ghcr.io/yul-1/lan-manager-backend"
+NGINX_IMG="ghcr.io/yul-1/lan-manager-nginx"
 OUT="dist/lanmng-${VERSION}.tar.gz"
 
 echo ">> Build ${BACKEND_IMG}:${VERSION}"

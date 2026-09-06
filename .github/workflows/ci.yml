@@ -1,0 +1,97 @@
+# Prova il codice che ricevono gli utenti, non una sua copia: questo repo e'
+# l'export sanificato, quindi cio' che passa qui e' esattamente cio' che viene
+# clonato.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# I workflow non scrivono niente: leggono il codice e basta.
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    name: Test backend (Python)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          # Stessa versione dell'immagine di produzione: un test che passa su
+          # una versione diversa da quella che gira non dice molto.
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.txt
+      - run: pip install -r backend/requirements-dev.txt
+      # Da backend/, non dalla radice: pytest.ini ha `pythonpath = .` perche'
+      # il progetto usa import piatti (`from config import settings`), gli
+      # stessi che usa il codice in produzione.
+      - run: python -m pytest
+        working-directory: backend
+
+  frontend:
+    name: Test frontend (node --test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      # Nessun package.json e nessun npm install: la suite gira sul runner
+      # integrato di node.
+      - run: ./scripts/test-js.sh
+
+  config:
+    name: Config di esempio valida e bilingue
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - run: pip install -r backend/requirements.txt
+      # I template sono la superficie di configurazione principale: se lo
+      # schema li rifiuta, chi installa se ne accorge al primo avvio invece
+      # che qui. E le due copie linguistiche devono restare la stessa config.
+      - name: Schema e parita' fra le copie EN/IT
+        run: |
+          python - <<'PY'
+          import sys, yaml
+          sys.path.insert(0, "backend")
+          from config import Settings
+
+          def chiavi(d, pref=""):
+              out = set()
+              if isinstance(d, dict):
+                  for k, v in d.items():
+                      out.add(pref + str(k)); out |= chiavi(v, pref + str(k) + ".")
+              elif isinstance(d, list):
+                  for i, v in enumerate(d): out |= chiavi(v, pref + f"[{i}].")
+              return out
+
+          errori = []
+          for f in ("config/config.example.yaml", "config/config.example.it.yaml"):
+              try:
+                  Settings(**yaml.safe_load(open(f)))
+                  print(f"ok   {f}")
+              except Exception as e:
+                  errori.append(f"{f}: {e}")
+
+          for a, b in (("config.example", "config.example.it"),
+                       ("devices.example", "devices.example.it"),
+                       ("services.example", "services.example.it")):
+              ka = chiavi(yaml.safe_load(open(f"config/{a}.yaml")))
+              kb = chiavi(yaml.safe_load(open(f"config/{b}.yaml")))
+              if ka != kb:
+                  errori.append(f"{a} e {b} non hanno le stesse chiavi: {sorted(ka ^ kb)}")
+              else:
+                  print(f"ok   {a} / {b}: {len(ka)} chiavi identiche")
+
+          if errori:
+              print("\n".join(errori), file=sys.stderr); sys.exit(1)
+          PY

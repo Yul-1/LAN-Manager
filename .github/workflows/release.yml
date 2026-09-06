@@ -1,0 +1,108 @@
+# Pubblica le immagini su GHCR quando si tagga una versione.
+#
+# Solo amd64: le immagini base sarebbero multi-arch, ma una build arm64 sotto
+# emulazione costa 15-25 minuti e chi ha ARM puo' costruirsele in un minuto
+# sulla propria macchina con `docker compose up --build`.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+  packages: write          # serve solo a pubblicare su ghcr.io
+
+env:
+  BACKEND: ghcr.io/${{ github.repository_owner }}/lan-manager-backend
+  NGINX: ghcr.io/${{ github.repository_owner }}/lan-manager-nginx
+
+jobs:
+  pubblica:
+    name: Build e push su GHCR
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Un'immagine etichettata con una versione che /health poi non riporta e'
+      # peggio di nessuna immagine: si sbaglia il rollback e non si capisce
+      # quale codice sta girando. Meglio fermarsi prima di pubblicare.
+      - name: Il tag deve combaciare con VERSION
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          versione="$(tr -d '[:space:]' < VERSION)"
+          if [ "$tag" != "$versione" ]; then
+            echo "::error::tag $GITHUB_REF_NAME ma VERSION dice $versione" >&2
+            exit 1
+          fi
+          echo "versione=$versione" >> "$GITHUB_ENV"
+          echo "Tag e VERSION combaciano: $versione"
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # Token del workflow: nessun segreto da configurare a mano.
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build e push del backend
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          push: true
+          tags: ${{ env.BACKEND }}:${{ env.versione }},${{ env.BACKEND }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build e push di nginx
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: nginx/Dockerfile
+          push: true
+          tags: ${{ env.NGINX }}:${{ env.versione }},${{ env.NGINX }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # Un'immagine che non parte non e' un rilascio. Finora questa prova la
+      # facevo a mano ad ogni versione: qui e' automatica e blocca il verde.
+      - name: L'immagine pubblicata deve rispondere
+        run: |
+          set -e
+          cfg="$(mktemp -d)" && chmod 777 "$cfg"
+          docker run -d --name prova -v "$cfg":/app/config:rw \
+            "$BACKEND:$versione" >/dev/null
+          # Si aspetta l'healthcheck dell'immagine invece di un `sleep` a caso:
+          # e' lo stesso segnale che usa Docker in produzione.
+          for _ in $(seq 1 40); do
+            stato="$(docker inspect -f '{{.State.Health.Status}}' prova 2>/dev/null || echo assente)"
+            [ "$stato" = "starting" ] || break
+            sleep 3
+          done
+          if [ "$stato" != "healthy" ]; then
+            echo "::error::il container non e' healthy (stato: $stato)" >&2
+            docker logs prova || true
+            exit 1
+          fi
+          risposta="$(docker exec prova python -c \
+            "import urllib.request,json;print(json.load(urllib.request.urlopen('http://127.0.0.1:8000/health'))['version'])")"
+          if [ "$risposta" != "$versione" ]; then
+            echo "::error::/health riporta $risposta, atteso $versione" >&2
+            exit 1
+          fi
+          echo "Container healthy, /health riporta $risposta"
+          docker rm -f prova >/dev/null
+
+      - name: Promemoria sulla visibilita' del package
+        run: |
+          echo "### Immagini pubblicate" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo '- `'"$BACKEND:$versione"'`' >> "$GITHUB_STEP_SUMMARY"
+          echo '- `'"$NGINX:$versione"'`' >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "**Al primo rilascio**: su GHCR un package nasce privato." >> "$GITHUB_STEP_SUMMARY"
+          echo "Va reso pubblico dalle sue impostazioni, altrimenti" >> "$GITHUB_STEP_SUMMARY"
+          echo '`docker compose pull` chiede le credenziali a chi lo usa.' >> "$GITHUB_STEP_SUMMARY"

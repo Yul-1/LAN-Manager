@@ -1,5 +1,7 @@
 # LAN-Manager
 
+[![CI](https://github.com/Yul-1/LAN-Manager/actions/workflows/ci.yml/badge.svg)](https://github.com/Yul-1/LAN-Manager/actions/workflows/ci.yml)
+
 **English** · [Italiano](README.it.md)
 
 Self-hosted dashboard to **manage, monitor and map your home or small-office LAN**.
@@ -65,6 +67,14 @@ configured from its own web UI rather than by editing files.
 git clone https://github.com/Yul-1/LAN-Manager.git
 cd LAN-Manager
 docker compose up --build
+```
+
+That builds the images locally, which takes a couple of minutes. To use the
+prebuilt ones instead — published for `linux/amd64` on every release — replace
+the last line with:
+
+```sh
+docker compose pull && docker compose up -d
 ```
 
 The dashboard is then on port 80 of the host, and it walks you through the rest:

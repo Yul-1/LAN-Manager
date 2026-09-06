@@ -12,6 +12,40 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+### Added
+- **Prebuilt images on GHCR** (`linux/amd64`), published on every release:
+  `docker compose pull && docker compose up -d` instead of building. Building
+  locally with `docker compose up --build` still works and is the only route on
+  ARM hosts.
+- **Continuous integration**: the backend suite, the frontend suite and a check
+  that both example configurations still validate and stay in step with their
+  translated copy, run on every push and pull request.
+- The release workflow refuses to publish when the tag does not match `VERSION`,
+  and starts the image it just built to check that `/health` answers with the
+  expected version before the release is marked green.
+
+### Changed
+- Images are now named after where they are published:
+  `ghcr.io/yul-1/lan-manager-backend` and `-nginx`. One name covers pulling,
+  building locally, and `docker save`/`docker load` for offline installs.
+
+### Aggiunto
+- **Immagini gia' pronte su GHCR** (`linux/amd64`), pubblicate ad ogni rilascio:
+  `docker compose pull && docker compose up -d` invece di compilare. La build
+  locale con `docker compose up --build` continua a funzionare, ed e' l'unica
+  strada sugli host ARM.
+- **Integrazione continua**: suite backend, suite frontend e un controllo che le
+  configurazioni di esempio restino valide e allineate alla copia tradotta, ad
+  ogni push e pull request.
+- Il workflow di rilascio si rifiuta di pubblicare se il tag non combacia con
+  `VERSION`, e avvia l'immagine appena costruita per verificare che `/health`
+  risponda con la versione attesa prima di dare il verde.
+
+### Modificato
+- Le immagini prendono il nome di dove vengono pubblicate:
+  `ghcr.io/yul-1/lan-manager-backend` e `-nginx`. Un nome solo per il pull, per
+  la build locale e per `docker save`/`docker load` senza internet.
+
 ## [1.1.0] - 2026-09-06
 
 ### Added

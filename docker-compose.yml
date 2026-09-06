@@ -8,7 +8,7 @@
 
 services:
   backend:
-    image: lanmng-backend:${TAG:-latest}
+    image: ghcr.io/yul-1/lan-manager-backend:${TAG:-latest}
     # Con `image` e `build` insieme docker compose costruisce SOLO se l'immagine
     # manca: dopo un `docker load` continua a usare quella caricata. Cosi'
     # `docker compose up --build` funziona appena clonato il repo, senza togliere
@@ -55,7 +55,7 @@ services:
       retries: 3
 
   nginx:
-    image: lanmng-nginx:${TAG:-latest}
+    image: ghcr.io/yul-1/lan-manager-nginx:${TAG:-latest}
     build:
       context: .
       dockerfile: nginx/Dockerfile

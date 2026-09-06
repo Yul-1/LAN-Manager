@@ -16,7 +16,7 @@
 
 services:
   backend:
-    image: lanmng-backend:${TAG:-latest}
+    image: ghcr.io/yul-1/lan-manager-backend:${TAG:-latest}
     container_name: lanmng-backend
     restart: unless-stopped
     # Host network: la discovery (nmap/ARP) deve vedere le subnet della LAN.
