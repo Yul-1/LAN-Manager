@@ -1,13 +1,21 @@
 # LANMng — reverse proxy LAN-only.
 # nginx gira in network_mode host: raggiunge il backend su 127.0.0.1:8000
 # (uvicorn e' in ascolto solo su loopback, non esposto direttamente in LAN).
+#
+# E' un TEMPLATE: l'entrypoint dell'immagine nginx lo espande con envsubst in
+# /etc/nginx/conf.d/default.conf all'avvio. L'unica variabile sostituita e'
+# LANMNG_HTTP_PORT (NGINX_ENVSUBST_FILTER nel Dockerfile), cosi' le variabili
+# di nginx ($host, $http_upgrade...) restano intatte.
 
 upstream lanmng_backend {
     server 127.0.0.1:8000;
 }
 
 server {
-    listen 80;
+    # Porta sull'host (network_mode host): con la 80 gia' occupata da un altro
+    # servizio nginx non partirebbe affatto, quindi la si sceglie da fuori con
+    # LANMNG_HTTP_PORT (vedi .env.example). Default 80.
+    listen ${LANMNG_HTTP_PORT};
     server_name _;
 
     # Gli stessi header del vhost per l'nginx host (deploy/lanmng.nginx.conf):

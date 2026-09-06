@@ -212,3 +212,28 @@ async def test_un_errore_diverso_e_uno_stato_diverso(ssh_pilotato, caplog):
         await client._run("docker ps")
 
     assert len([r for r in caplog.records if "192.0.2.3" in r.getMessage()]) == 2
+
+
+# ── Socket Docker locale negato ────────────────────────────────────
+# Sulla VM di prova (2026-09-06) il compose della radice non concedeva al
+# container il gruppo docker dell'host: il log diceva solo
+# "[Errno 13] Permission denied", che non indica nessun rimedio a chi installa.
+
+def test_il_socket_locale_negato_suggerisce_docker_gid(caplog):
+    client = EngineDockerClient(name="localhost", socket="/var/run/docker.sock")
+    with caplog.at_level(logging.ERROR, logger="docker"):
+        client._traccia("[Errno 13] Permission denied")
+
+    messaggio = caplog.records[-1].getMessage()
+    assert "Errno 13" in messaggio, "l'errore vero resta"
+    assert "DOCKER_GID" in messaggio, "e accanto ci sta il rimedio"
+
+
+def test_un_engine_remoto_non_riceve_il_suggerimento(caplog):
+    """Su un Engine via TCP il gruppo docker dell'host locale non c'entra:
+    suggerirlo manderebbe fuori strada."""
+    client = EngineDockerClient(name="nas", host="192.0.2.10")
+    with caplog.at_level(logging.ERROR, logger="docker"):
+        client._traccia("[Errno 13] Permission denied")
+
+    assert "DOCKER_GID" not in caplog.records[-1].getMessage()

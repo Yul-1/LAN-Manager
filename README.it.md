@@ -83,9 +83,31 @@ Se preferisci configurare a mano, copia `config/config.example.it.yaml` in
 `config/config.yaml` e modificalo prima del primo avvio: la procedura guidata si
 fa da parte appena una configurazione esiste.
 
-Se l'host ha gia' un suo nginx sulla porta 80, si usa il profilo alternativo
-`deploy/docker-compose.host-nginx.yml`, che avvia il solo backend e lascia al tuo
-nginx il compito di servire il frontend — vedi i commenti in quel file.
+**Se la porta 80 e' gia' occupata** sull'host, nginx non parte affatto
+(`bind() to 0.0.0.0:80 failed (98: Address in use)`, ripetuto all'infinito): i
+container girano in `network_mode: host`, quindi non c'e' nessuna pubblicazione di
+porte da rimappare. Se ne sceglie un'altra:
+
+```sh
+LANMNG_HTTP_PORT=8080 docker compose up --build -d
+```
+
+La stessa riga in un file `.env` accanto al compose la rende permanente.
+
+**Il monitoraggio Docker** vuole il gruppo `docker` dell'host: il backend gira
+come utente non-root e `/var/run/docker.sock` e' `root:docker`. Il compose da'
+per buono il gid 999, il valore tipico su Debian e Ubuntu; se il tuo e' diverso
+la pagina Servizi resta senza i container locali e il log lo dice. Ricavalo con
+`getent group docker | cut -d: -f3` e mettilo nello stesso `.env`:
+
+```sh
+DOCKER_GID=123
+```
+
+Se l'host ha gia' un suo nginx sulla porta 80, l'altra strada e' il profilo
+alternativo `deploy/docker-compose.host-nginx.yml`, che avvia il solo backend e
+lascia al tuo nginx il compito di servire il frontend — vedi i commenti in quel
+file.
 
 ## Configurazione
 

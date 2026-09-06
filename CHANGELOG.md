@@ -12,6 +12,36 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-09-06
+
+### Fixed
+- **The stack now starts on a host whose port 80 is busy.** nginx used to loop on
+  `bind() to 0.0.0.0:80 failed (98: Address in use)` and the dashboard was
+  unreachable, with no way out short of editing the source: the port was written
+  into the vhost, and `network_mode: host` leaves no port mapping to change. Set
+  `LANMNG_HTTP_PORT` (default 80) in your `.env` or on the command line.
+- **Local Docker monitoring works out of the box.** The root compose file never
+  granted the host's `docker` group, so the non-root backend could not read
+  `/var/run/docker.sock` and the Services page stayed empty with
+  `[Errno 13] Permission denied`. It now uses `DOCKER_GID` (default 999, the
+  usual value on Debian and Ubuntu), and if the gid is wrong the log says how to
+  find yours instead of only reporting the error.
+
+### Risolto
+- **Lo stack parte anche dove la porta 80 e' occupata.** Prima nginx ripeteva
+  all'infinito `bind() to 0.0.0.0:80 failed (98: Address in use)` e la dashboard
+  era irraggiungibile, senza rimedio se non modificare il sorgente: la porta era
+  scritta nel vhost e con `network_mode: host` non c'e' nessuna pubblicazione di
+  porte da rimappare. Ora si sceglie con `LANMNG_HTTP_PORT` (default 80), nel
+  `.env` o sulla riga di comando.
+- **Il monitoraggio Docker locale funziona da subito.** Il compose della radice
+  non concedeva il gruppo `docker` dell'host, quindi il backend (utente non-root)
+  non poteva leggere `/var/run/docker.sock` e la pagina Servizi restava vuota con
+  `[Errno 13] Permission denied`. Ora usa `DOCKER_GID` (default 999, il valore
+  tipico su Debian e Ubuntu) e se il gid e' sbagliato il log dice come ricavare
+  il proprio, invece di riportare solo l'errore.
+
+
 ## [1.1.0] - 2026-09-06
 
 ### Added

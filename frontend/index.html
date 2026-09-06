@@ -7,17 +7,17 @@
   <!-- Il tema PRIMA del foglio di stile, altrimenti ad ogni caricamento si vede
        un lampo del tema sbagliato. File a parte e non script inline: la CSP del
        vhost (default-src 'self') rifiuta l'inline senza dirlo alla pagina. -->
-  <script src="./tema.js?v=1.1.0"></script>
+  <script src="./tema.js?v=1.1.1"></script>
   <!-- i18n prima dei cataloghi, i cataloghi prima di app.js: t() deve esistere
        gia' al primo render, o si vedrebbero le chiavi al posto del testo.
        Cataloghi come file a parte e non caricati con fetch: la CSP del vhost
        (default-src 'self') e il funzionamento senza internet. -->
-  <script src="./i18n.js?v=1.1.0"></script>
-  <script src="./i18n/en.js?v=1.1.0"></script>
-  <script src="./i18n/it.js?v=1.1.0"></script>
+  <script src="./i18n.js?v=1.1.1"></script>
+  <script src="./i18n/en.js?v=1.1.1"></script>
+  <script src="./i18n/it.js?v=1.1.1"></script>
   <!-- Il ?v= cambia l'URL ad ogni release: le copie gia' in cache nei browser
        vengono scartate subito. Va aggiornato con il file VERSION. -->
-  <link rel="stylesheet" href="./styles.css?v=1.1.0">
+  <link rel="stylesheet" href="./styles.css?v=1.1.1">
 </head>
 <body>
   <div class="app" id="app">
@@ -76,7 +76,7 @@
     </div>
   </div>
 
-  <script src="./terminal.js?v=1.1.0"></script>
-  <script src="./app.js?v=1.1.0"></script>
+  <script src="./terminal.js?v=1.1.1"></script>
+  <script src="./app.js?v=1.1.1"></script>
 </body>
 </html>

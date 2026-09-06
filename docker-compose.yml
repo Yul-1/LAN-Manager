@@ -42,6 +42,14 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+    # Il socket Docker e' root:docker e il container gira come appuser (uid 1000),
+    # che in quel gruppo non c'e': senza un gruppo supplementare il monitoraggio
+    # dei container locali fallisce con "Permission denied". Il gid del gruppo
+    # docker cambia da host a host (999 e' quello tipico su Debian/Ubuntu): se il
+    # tuo e' diverso mettilo in DOCKER_GID nel file .env accanto a questo compose,
+    #   getent group docker | cut -d: -f3
+    group_add:
+      - "${DOCKER_GID:-999}"
     volumes:
       - ./config:/app/config:rw                       # editabile da UI -> rw
       - ./ssh:/app/ssh:ro                             # chiave SSH router (ro)
@@ -62,12 +70,18 @@ services:
     container_name: lanmng-nginx
     restart: unless-stopped
     # Host network anche per nginx: cosi' raggiunge il backend su 127.0.0.1:8000
-    # ed espone la dashboard sulla porta 80 dell'host.
+    # ed espone la dashboard direttamente su una porta dell'host (LANMNG_HTTP_PORT).
     network_mode: host
     # Qui nessun setcap in gioco (nginx usa NET_BIND_SERVICE dal set di default),
     # quindi la flag e' sicura: nessun exec potra' guadagnare privilegi nuovi.
     security_opt:
       - no-new-privileges:true
+    # Porta della dashboard sull'host. Con network_mode host non c'e' nessuna
+    # pubblicazione di porte da rimappare: la scelta arriva qui, e il template
+    # del vhost la usa nella direttiva listen. Se la 80 e' gia' occupata da un
+    # altro servizio, LANMNG_HTTP_PORT=8080 nel file .env e nginx parte.
+    environment:
+      - LANMNG_HTTP_PORT=${LANMNG_HTTP_PORT:-80}
     logging:
       driver: json-file
       options:

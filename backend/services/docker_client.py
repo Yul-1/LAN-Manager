@@ -140,10 +140,20 @@ class EngineDockerClient:
         if errore == self._errore_loggato:
             return
         if errore:
-            log.error(f"docker {self.name}: {errore}")
+            log.error(f"docker {self.name}: {errore}{self._rimedio(errore)}")
         else:
             log.info(f"docker {self.name}: torna a rispondere")
         self._errore_loggato = errore
+
+    def _rimedio(self, errore: str) -> str:
+        """Il socket Docker locale non leggibile non e' un guasto ma un
+        permesso da concedere sull'host, e "Permission denied" da solo non dice
+        a chi installa cosa fare: il rimedio va nella stessa riga di log."""
+        if self.is_local and ("Errno 13" in errore or "Permission denied" in errore):
+            return (" — il socket appartiene al gruppo docker e il container gira"
+                    " come utente non-root: metti DOCKER_GID (getent group docker"
+                    " | cut -d: -f3) nel file .env accanto al compose e riavvia")
+        return ""
 
     @property
     def is_local(self) -> bool:
