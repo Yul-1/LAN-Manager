@@ -13,11 +13,12 @@
      4. sopra le otto porte aperte le altre sparivano in silenzio.
    =================================================================== */
 import { readFileSync } from "node:fs";
+import { SORGENTE_APP } from "./sorgente.mjs";
 import { createContext, runInContext } from "node:vm";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const SORGENTE = readFileSync(new URL("../app.js", import.meta.url), "utf8")
+const SORGENTE = SORGENTE_APP
   + "\n;globalThis.__interni = { state, PAGES, map, devFilter };";
 const CSS = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
 
@@ -332,8 +333,14 @@ test("senza subnet configurate il placeholder resta vuoto", () => {
 test("nessun indirizzo privato scritto a mano in app.js", () => {
   // La riga "192.168.x.x" era sfuggita al controllo dei dati personali, che
   // cercava 192.168 seguito da una cifra. Qui si guarda il sorgente intero.
+  //
+  // Unica eccezione ammessa: `SETUP_CIDR_ESEMPIO`, l'esempio di formato del
+  // primo avvio. Li' una configurazione da cui ricavarlo non esiste ancora per
+  // definizione. E' ammessa **quella riga sola**, cosi' l'eccezione resta in un
+  // posto solo e qualunque altro indirizzo scritto a mano fa fallire il test.
   const righe = SORGENTE.split("\n")
     .filter(r => /\b(10|192\.168|172\.(1[6-9]|2\d|3[01])|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7]))\.[\dx]+\.[\dx]+\b/.test(r))
-    .filter(r => !r.trim().startsWith("*") && !r.trim().startsWith("//"));
+    .filter(r => !r.trim().startsWith("*") && !r.trim().startsWith("//"))
+    .filter(r => !r.startsWith("const SETUP_CIDR_ESEMPIO ="));
   assert.deepEqual(righe, [], "indirizzi privati nel codice: devono venire dalla config");
 });

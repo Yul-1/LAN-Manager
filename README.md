@@ -6,11 +6,8 @@ Self-hosted dashboard to **manage, monitor and map your home or small-office LAN
 Runs in Docker, reachable **from your private network only**, and is meant to be
 configured from its own web UI rather than by editing files.
 
-> **Version 1.0.0** - the first public release. See [CHANGELOG.md](CHANGELOG.md).
->
-> Not in this release, and honest about it: the first-run wizard described below
-> is not built yet, so the initial configuration is done by copying and editing a
-> template, and the interface is currently in Italian only. Both land in `1.1.0`.
+> **Version 1.1.0** - English and Italian interface, and a guided first run.
+> See [CHANGELOG.md](CHANGELOG.md).
 
 ## What it does
 
@@ -49,8 +46,11 @@ configured from its own web UI rather than by editing files.
    configuration — ideally from the UI — and nothing else.
 3. **Private network only.** This is not built to face the internet, and the
    documentation will keep saying so.
-4. **Bilingual.** English and Italian, switchable at runtime, across the interface,
-   the API error messages, the example configuration and the documentation.
+4. **Bilingual.** English and Italian across the interface, the API error
+   messages, the example configuration and the documentation. The language
+   switches at runtime, with no reload, and the choice stays in your browser -
+   so the phone and the desktop can differ. Set `ui.default_language` to pick
+   the default for everyone; whoever chooses from the dashboard still wins.
 
 ## Requirements
 
@@ -64,17 +64,18 @@ configured from its own web UI rather than by editing files.
 ```sh
 git clone https://github.com/Yul-1/LAN-Manager.git
 cd LAN-Manager
-
-# Your configuration. Edit at least the `subnets` block: the file ships with
-# RFC 5737 documentation ranges, which match no real network on purpose.
-cp config/config.example.yaml config/config.yaml
-
 docker compose up --build
 ```
 
-The dashboard is then on port 80 of the host. On first visit it asks you to
-choose the admin password, which is stored as a bcrypt hash in
+The dashboard is then on port 80 of the host, and it walks you through the rest:
+it proposes the networks to monitor by reading this machine's interfaces, asks
+for your router if you have one, and writes the configuration for you. Then it
+asks you to choose the admin password, stored as a bcrypt hash in
 `config/secrets.env` and never in `config.yaml`.
+
+If you would rather configure it by hand, copy `config/config.example.yaml` to
+`config/config.yaml` and edit it before the first start - the wizard steps aside
+as soon as a configuration exists.
 
 If the host already runs its own nginx on port 80, use the alternative profile
 `deploy/docker-compose.host-nginx.yml`, which starts the backend only and lets

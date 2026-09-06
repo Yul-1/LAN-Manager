@@ -12,11 +12,40 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
-Planned for `1.1.0`: a guided first-run setup, and an English interface
-alongside the Italian one.
+## [1.1.0] - 2026-09-06
 
-Previsto per la `1.1.0`: configurazione guidata al primo avvio, e interfaccia in
-inglese accanto a quella italiana.
+### Added
+- **Guided first run.** With no configuration, the dashboard now walks you
+  through it instead of coming up empty: it proposes the networks to monitor by
+  reading the host's interfaces, optionally takes your router, and writes the
+  configuration for you. Nothing to edit by hand to get started.
+- **English and Italian interface**, switchable from Settings with no reload.
+  The choice is remembered per browser, so a phone and a desktop can differ.
+  API error messages follow the browser's `Accept-Language`.
+- `ui.default_language` sets the service-wide default for people who install on
+  someone else's behalf. It never overrides a choice already made from the
+  dashboard.
+- `docker compose up --build` builds and starts the stack from a fresh clone.
+
+### Fixed
+- Address fields no longer suggest an example network of their own: the hint
+  now comes from the subnets you configured, and is empty when there are none.
+
+### Aggiunto
+- **Primo avvio guidato.** Senza configurazione la dashboard ora guida invece di
+  presentarsi vuota: propone le reti da monitorare leggendo le interfacce
+  dell'host, prende il router se ne hai uno, e scrive la configurazione. Per
+  partire non c'e' niente da modificare a mano.
+- **Interfaccia in italiano e inglese**, si cambia da Impostazioni senza
+  ricaricare. La scelta resta nel browser, quindi telefono e PC possono
+  differire. I messaggi d'errore dell'API seguono l'`Accept-Language`.
+- `ui.default_language` per la lingua predefinita del servizio, utile a chi
+  installa per un'altra persona. Non scavalca mai una scelta gia' fatta.
+- `docker compose up --build` costruisce e avvia lo stack da un clone pulito.
+
+### Corretto
+- I campi indirizzo non suggeriscono piu' una rete d'esempio propria: il
+  suggerimento viene dalle subnet configurate, ed e' vuoto se non ce ne sono.
 
 ## [1.0.0] - 2026-09-06
 
@@ -66,6 +95,7 @@ Primo rilascio pubblico.
 - Repository initialized under the MIT License.
 - Repository inizializzato con licenza MIT.
 
-[Unreleased]: https://github.com/Yul-1/LAN-Manager/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Yul-1/LAN-Manager/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Yul-1/LAN-Manager/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Yul-1/LAN-Manager/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/Yul-1/LAN-Manager/releases/tag/v0.1.0

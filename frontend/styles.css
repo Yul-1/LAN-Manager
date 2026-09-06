@@ -755,6 +755,13 @@ a.link:hover { color: var(--teal); }
 code { background: var(--panel-2); padding: 1px 5px; border-radius: 5px; font-family: var(--mono); font-size: 12px; }
 
 /* ── Login ───────────────────────────────────────────────────────── */
+/* Righe del primo avvio: CIDR e nome affiancati, con il pulsante per togliere
+   la riga. Griglia e non flex perche' i due campi devono restare allineati fra
+   una riga e l'altra anche quando il nome e' vuoto. */
+.sw-riga { display: grid; grid-template-columns: 1fr 100px auto; gap: 6px; margin-bottom: 6px; }
+.sw-riga input { width: 100%; }
+.sw-riga .sw-del { padding: 0 9px; line-height: 1; }
+
 .login-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
 .login { width: 340px; max-width: 92vw; }
 .login label { display: block; margin-bottom: 11px; font-size: 12px; color: var(--muted); }

@@ -12,6 +12,7 @@
    richiamerebbero all'infinito e la pagina si pianterebbe.
    =================================================================== */
 import { readFileSync } from "node:fs";
+import { SORGENTE_APP } from "./sorgente.mjs";
 import { createContext, runInContext } from "node:vm";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -19,7 +20,7 @@ import assert from "node:assert/strict";
 /* `state` e `PAGES` sono `const`: in un contesto vm non diventano proprieta'
    dell'oggetto globale (solo `var` e le function declaration lo fanno). Un
    epilogo li espone senza toccare il sorgente vero. */
-const SORGENTE = readFileSync(new URL("../app.js", import.meta.url), "utf8")
+const SORGENTE = SORGENTE_APP
   + "\n;globalThis.__interni = { state, PAGES };";
 
 /* Elemento minimo: tiene il conto di quante volte gli si riscrive dentro.

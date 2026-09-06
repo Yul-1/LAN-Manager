@@ -17,6 +17,7 @@
         non e' detto che qualcuno lo apra.
    =================================================================== */
 import { readFileSync } from "node:fs";
+import { SORGENTE_APP } from "./sorgente.mjs";
 import { createContext, runInContext } from "node:vm";
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -24,7 +25,7 @@ import assert from "node:assert/strict";
 const CSS = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
 const INDEX = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const AVVIO = readFileSync(new URL("../tema.js", import.meta.url), "utf8");
-const SORGENTE = readFileSync(new URL("../app.js", import.meta.url), "utf8")
+const SORGENTE = SORGENTE_APP
   + "\n;globalThis.__interni = { state, map, TEMI, TOKEN_TEMA, PALETTE_DARK };";
 
 /* Un tema finto: ogni token ha un colore riconoscibile a occhio nudo nelle

@@ -18,11 +18,12 @@
         si leggerebbe come un dato misurato che non e' mai esistito.
    =================================================================== */
 import { readFileSync } from "node:fs";
+import { SORGENTE_APP } from "./sorgente.mjs";
 import { createContext, runInContext } from "node:vm";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const SORGENTE = readFileSync(new URL("../app.js", import.meta.url), "utf8")
+const SORGENTE = SORGENTE_APP
   + "\n;globalThis.__interni = { ZOOM_MIN_PUNTI };";
 
 /* Contesto 2D che registra invece di disegnare: i test guardano cosa e'

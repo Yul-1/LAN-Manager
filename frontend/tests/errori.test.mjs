@@ -9,12 +9,16 @@
    scaduta non faccia perdere l'operazione in corso.
    =================================================================== */
 import { readFileSync } from "node:fs";
+import { SORGENTE_APP } from "./sorgente.mjs";
 import { createContext, runInContext } from "node:vm";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
+// PERCORSO resta: l'ultimo test ispeziona il sorgente di app.js DA SOLO
+// (fetch sparse, alert, messaggi generici), e li' la concatenazione con i
+// cataloghi falserebbe i conteggi.
 const PERCORSO = new URL("../app.js", import.meta.url);
-const SORGENTE = readFileSync(PERCORSO, "utf8")
+const SORGENTE = SORGENTE_APP
   + "\n;globalThis.__interni = { state, PAGES, toastVivi };";
 
 /* Risposta finta: `api()` legge SEMPRE il corpo come testo, quindi il finto

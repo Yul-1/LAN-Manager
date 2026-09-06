@@ -13,11 +13,12 @@
    sistemarsi da sola, senza raffreddamenti — resta com'era.
    =================================================================== */
 import { readFileSync } from "node:fs";
+import { SORGENTE_APP } from "./sorgente.mjs";
 import { createContext, runInContext } from "node:vm";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const SORGENTE = readFileSync(new URL("../app.js", import.meta.url), "utf8")
+const SORGENTE = SORGENTE_APP
   + "\n;globalThis.__interni = { state, map, ARIA_ETICHETTA };";
 
 function elemento(rect = { width: 1014, height: 520 }) {

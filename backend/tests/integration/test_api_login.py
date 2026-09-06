@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import pytest
 
+from services.i18n import t
+
 from config import settings
 from middleware.auth import COOKIE
 from tests.conftest import TEST_PASSWORD
@@ -50,7 +52,7 @@ def test_lo_stato_riflette_la_sessione(client):
 def test_password_sbagliata_respinta(client):
     r = _login(client, password="non-e-questa")
     assert r.status_code == 401
-    assert r.json()["detail"] == "credenziali non valide"
+    assert r.json()["detail"] == t("err.credenziali", lingua="en")
     assert COOKIE not in r.cookies
 
 
@@ -83,7 +85,7 @@ def test_dopo_cinque_tentativi_falliti_il_sesto_e_429(client):
         assert _login(client, password=f"sbagliata-{i}").status_code == 401
     r = _login(client, password="sbagliata-6")
     assert r.status_code == 429
-    assert "troppi tentativi" in r.json()["detail"]
+    assert r.json()["detail"] == t("err.troppiTentativi", lingua="en")
 
 
 def test_il_limite_blocca_anche_la_password_giusta(client):

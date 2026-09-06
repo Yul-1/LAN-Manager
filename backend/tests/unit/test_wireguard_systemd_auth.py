@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from config import settings
+from services.i18n import t
 from middleware.auth import (auth_enabled, is_lan, make_token, same_origin,
                              security_warnings, valid_token)
 from services.systemd_monitor import _from_props, _parse_props, _unavailable
@@ -231,7 +232,7 @@ def test_una_configurazione_chiusa_non_produce_avvisi():
 def test_auth_spenta_viene_denunciata(monkeypatch):
     monkeypatch.setattr(settings.auth, "method", "none")
     avvisi = security_warnings()
-    assert len(avvisi) == 1 and "auth.method: none" in avvisi[0]
+    assert avvisi == [t("sicurezza.authNone", lingua="en")]
     assert auth_enabled() is False
 
 
@@ -249,7 +250,7 @@ def test_una_password_admin_mancante_viene_denunciata(monkeypatch):
     monkeypatch.delenv("LAN_AUTH__PASSWORD_HASH", raising=False)
     monkeypatch.setattr(settings.auth, "password_hash", "")
     avvisi = security_warnings()
-    assert any("nessuna password admin" in a for a in avvisi)
+    assert t("sicurezza.nessunaPassword", lingua="en") in avvisi
 
 
 def test_nessun_avviso_contiene_un_valore_di_configurazione(monkeypatch):

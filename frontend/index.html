@@ -7,10 +7,17 @@
   <!-- Il tema PRIMA del foglio di stile, altrimenti ad ogni caricamento si vede
        un lampo del tema sbagliato. File a parte e non script inline: la CSP del
        vhost (default-src 'self') rifiuta l'inline senza dirlo alla pagina. -->
-  <script src="./tema.js?v=1.0.0"></script>
+  <script src="./tema.js?v=1.1.0"></script>
+  <!-- i18n prima dei cataloghi, i cataloghi prima di app.js: t() deve esistere
+       gia' al primo render, o si vedrebbero le chiavi al posto del testo.
+       Cataloghi come file a parte e non caricati con fetch: la CSP del vhost
+       (default-src 'self') e il funzionamento senza internet. -->
+  <script src="./i18n.js?v=1.1.0"></script>
+  <script src="./i18n/en.js?v=1.1.0"></script>
+  <script src="./i18n/it.js?v=1.1.0"></script>
   <!-- Il ?v= cambia l'URL ad ogni release: le copie gia' in cache nei browser
        vengono scartate subito. Va aggiornato con il file VERSION. -->
-  <link rel="stylesheet" href="./styles.css?v=1.0.0">
+  <link rel="stylesheet" href="./styles.css?v=1.1.0">
 </head>
 <body>
   <div class="app" id="app">
@@ -26,24 +33,24 @@
            monocromatici, e quattro di loro — Dashboard, Host, Terminale, Logs —
            erano rettangoli scuri che non si distinguevano fra loro. -->
       <nav class="nav" id="nav">
-        <div class="nav-sez">Rete</div>
-        <a data-route="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg> Dashboard <span class="badge alert" data-route="dashboard" hidden></span></a>
-        <a data-route="devices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> Dispositivi <span class="badge muted" id="nav-devices"></span> <span class="badge alert" data-route="devices" hidden></span></a>
-        <a data-route="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> Stats &amp; Traffico <span class="badge alert" data-route="stats" hidden></span></a>
-        <a data-route="wan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> WAN <span class="badge alert" data-route="wan" hidden></span></a>
+        <div class="nav-sez" data-i18n="nav.sezione.rete">Rete</div>
+        <a data-route="dashboard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg> <span data-i18n="nav.dashboard">Dashboard</span> <span class="badge alert" data-route="dashboard" hidden></span></a>
+        <a data-route="devices"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> <span data-i18n="nav.devices">Dispositivi</span> <span class="badge muted" id="nav-devices"></span> <span class="badge alert" data-route="devices" hidden></span></a>
+        <a data-route="stats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg> <span data-i18n="nav.stats">Stats &amp; Traffico</span> <span class="badge alert" data-route="stats" hidden></span></a>
+        <a data-route="wan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg> <span data-i18n="nav.wan">WAN</span> <span class="badge alert" data-route="wan" hidden></span></a>
 
-        <div class="nav-sez">Servizi</div>
-        <a data-route="services"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg> Monitoraggio <span class="badge muted" id="nav-services"></span> <span class="badge alert" data-route="services" hidden></span></a>
-        <a data-route="wireguard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> WireGuard <span class="badge muted" id="nav-wg"></span> <span class="badge alert" data-route="wireguard" hidden></span></a>
+        <div class="nav-sez" data-i18n="nav.sezione.servizi">Servizi</div>
+        <a data-route="services"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/></svg> <span data-i18n="nav.services">Monitoraggio</span> <span class="badge muted" id="nav-services"></span> <span class="badge alert" data-route="services" hidden></span></a>
+        <a data-route="wireguard"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg> <span data-i18n="nav.wireguard">WireGuard</span> <span class="badge muted" id="nav-wg"></span> <span class="badge alert" data-route="wireguard" hidden></span></a>
 
-        <div class="nav-sez">Strumenti</div>
-        <a data-route="tools"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><line x1="12" y1="1.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22.5" y2="12"/></svg> Tools <span class="badge alert" data-route="tools" hidden></span></a>
-        <a data-route="terminal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><polyline points="7 9 10 12 7 15"/><line x1="13" y1="15" x2="17" y2="15"/></svg> Terminale <span class="badge alert" data-route="terminal" hidden></span></a>
+        <div class="nav-sez" data-i18n="nav.sezione.strumenti">Strumenti</div>
+        <a data-route="tools"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/><line x1="12" y1="1.5" x2="12" y2="5"/><line x1="12" y1="19" x2="12" y2="22.5"/><line x1="1.5" y1="12" x2="5" y2="12"/><line x1="19" y1="12" x2="22.5" y2="12"/></svg> <span data-i18n="nav.tools">Tools</span> <span class="badge alert" data-route="tools" hidden></span></a>
+        <a data-route="terminal"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="18" rx="2"/><polyline points="7 9 10 12 7 15"/><line x1="13" y1="15" x2="17" y2="15"/></svg> <span data-i18n="nav.terminal">Terminale</span> <span class="badge alert" data-route="terminal" hidden></span></a>
 
-        <div class="nav-sez">Sistema</div>
-        <a data-route="host"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg> Host <span class="badge alert" data-route="host" hidden></span></a>
-        <a data-route="logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> Logs <span class="badge alert" data-route="logs" hidden></span></a>
-        <a data-route="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg> Impostazioni <span class="badge alert" data-route="settings" hidden></span></a>
+        <div class="nav-sez" data-i18n="nav.sezione.sistema">Sistema</div>
+        <a data-route="host"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="12" x2="2" y2="12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/><line x1="6" y1="16" x2="6.01" y2="16"/><line x1="10" y1="16" x2="10.01" y2="16"/></svg> <span data-i18n="nav.host">Host</span> <span class="badge alert" data-route="host" hidden></span></a>
+        <a data-route="logs"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg> <span data-i18n="nav.logs">Logs</span> <span class="badge alert" data-route="logs" hidden></span></a>
+        <a data-route="settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg> <span data-i18n="nav.settings">Impostazioni</span> <span class="badge alert" data-route="settings" hidden></span></a>
       </nav>
       <div class="foot" id="foot-info">—</div>
     </aside>
@@ -54,12 +61,12 @@
       <header class="topbar">
         <!-- Visibile solo sotto la soglia mobile: senza di lui la sidebar
              nascosta lascerebbe bloccati sulla pagina di partenza. -->
-        <button class="navbtn" id="nav-toggle" aria-label="Apri il menu"
+        <button class="navbtn" id="nav-toggle" aria-label="Apri il menu" data-i18n-attr="aria-label:topbar.apriMenu"
                 aria-controls="sidebar" aria-expanded="false">☰</button>
-        <h1 id="page-title">Dashboard</h1>
+        <h1 id="page-title" data-i18n="pagina.dashboard">Dashboard</h1>
         <div class="spacer"></div>
-        <span class="pill" id="logout" style="display:none;cursor:pointer" title="Esci">esci</span>
-        <span class="pill" id="conn"><span class="dot"></span> connessione…</span>
+        <span class="pill" id="logout" style="display:none;cursor:pointer" title="Esci" data-i18n="topbar.esciBreve" data-i18n-attr="title:topbar.esci">esci</span>
+        <span class="pill" id="conn"><span class="dot"></span> <span data-i18n="topbar.connessione">connessione…</span></span>
         <span class="pill" id="updated">—</span>
       </header>
       <!-- Popolato da boot() quando /api/auth/status segnala che l'API risponde
@@ -69,7 +76,7 @@
     </div>
   </div>
 
-  <script src="./terminal.js?v=1.0.0"></script>
-  <script src="./app.js?v=1.0.0"></script>
+  <script src="./terminal.js?v=1.1.0"></script>
+  <script src="./app.js?v=1.1.0"></script>
 </body>
 </html>

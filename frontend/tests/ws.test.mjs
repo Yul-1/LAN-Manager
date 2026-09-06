@@ -8,11 +8,12 @@
    un dato di mezz'ora prima.
    =================================================================== */
 import { readFileSync } from "node:fs";
+import { SORGENTE_APP } from "./sorgente.mjs";
 import { createContext, runInContext } from "node:vm";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const SORGENTE = readFileSync(new URL("../app.js", import.meta.url), "utf8")
+const SORGENTE = SORGENTE_APP
   + "\n;globalThis.__interni = { state, WS_BACKOFF };";
 
 /* Contesto 2D finto: l'arrivo di uno snapshot ridisegna la pagina attiva, che

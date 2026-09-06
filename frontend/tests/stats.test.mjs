@@ -12,11 +12,12 @@
         tabella delle interfacce mostrava numeri vecchi come nuovi.
    =================================================================== */
 import { readFileSync } from "node:fs";
+import { SORGENTE_APP } from "./sorgente.mjs";
 import { createContext, runInContext } from "node:vm";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const SORGENTE = readFileSync(new URL("../app.js", import.meta.url), "utf8")
+const SORGENTE = SORGENTE_APP
   + "\n;globalThis.__interni = { state, PAGES, PERIODI, statsHist,"
   + "\n  get periodo() { return statsPeriod; }, set periodo(v) { statsPeriod = v; } };";
 

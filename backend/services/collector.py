@@ -628,6 +628,9 @@ def _build_meta() -> dict:
         "wan_candidates": list(settings.router.wan_candidates or []),
         "subnets": [{"cidr": s.cidr, "label": s.label, "color": s.color}
                     for s in settings.subnets],
+        # Lingua predefinita del servizio: la SPA la applica solo a chi non ne
+        # ha gia' scelta una nel proprio browser.
+        "default_language": settings.ui.default_language or "",
     }
 
 

@@ -38,18 +38,21 @@ function lastTrafficPoint(series) {
   return {};
 }
 function ago(ts) {
-  if (!ts) return "mai";
-  const d = Math.floor(Date.now() / 1000) - ts;
-  if (d < 60) return `${d}s fa`;
-  if (d < 3600) return `${Math.floor(d / 60)}m fa`;
-  if (d < 86400) return `${Math.floor(d / 3600)}h fa`;
-  return `${Math.floor(d / 86400)}g fa`;
+  if (!ts) return t("tempo.mai");
+  return t("tempo.fa", { v: durata(ts) });
 }
 
-/* Come `ago`, ma senza il "fa": serve dove la frase e' gia' "da ..." o
-   "fermo da ...", che con il "fa" diventerebbe "da 5m fa". */
+/* Intervallo trascorso, senza il "fa": serve dove la frase e' gia' "da ..." o
+   "fermo da ...", che con il "fa" diventerebbe "da 5m fa". E' la funzione base
+   e `ago` ci aggiunge il suffisso: prima era il contrario, con una regex che
+   toglieva " fa" — e quella regex conosce una lingua sola. */
 function durata(ts) {
-  return ago(ts).replace(/ fa$/, "");
+  if (!ts) return t("tempo.mai");
+  const d = Math.floor(Date.now() / 1000) - ts;
+  if (d < 60) return t("tempo.secondi", { n: d });
+  if (d < 3600) return t("tempo.minuti", { n: Math.floor(d / 60) });
+  if (d < 86400) return t("tempo.ore", { n: Math.floor(d / 3600) });
+  return t("tempo.giorni", { n: Math.floor(d / 86400) });
 }
 
 /* ── Tema ─────────────────────────────────────────────────────────
@@ -60,21 +63,23 @@ function durata(ts) {
    L'attributo lo stampa gia' lo script in testa a index.html, prima che il CSS
    dipinga: queste funzioni servono al selettore in Impostazioni. */
 const TEMA_KEY = "lanmng.tema";
+// nome/nota sono CHIAVI, non testo: il selettore le risolve quando disegna,
+// cosi' cambiare lingua non richiede di ricostruire questa tabella.
 const TEMI = [
-  { id: "dark",      nome: "Dark",           nota: "quello di sempre, stile Grafana" },
-  { id: "pastello",  nome: "Pastello",       nota: "pastelli tenui su viola smorzato" },
-  { id: "neon",      nome: "Neon",           nota: "bordi, titoli e numeri accesi su nero" },
-  { id: "chiaro",    nome: "Chiaro",         nota: "carta calda, niente bianco pieno" },
-  { id: "contrasto", nome: "Alto contrasto", nota: "testo piu' grande, colori netti" },
+  { id: "dark",      nome: "tema.dark",      nota: "tema.dark.nota" },
+  { id: "pastello",  nome: "tema.pastello",  nota: "tema.pastello.nota" },
+  { id: "neon",      nome: "tema.neon",      nota: "tema.neon.nota" },
+  { id: "chiaro",    nome: "tema.chiaro",    nota: "tema.chiaro.nota" },
+  { id: "contrasto", nome: "tema.contrasto", nota: "tema.contrasto.nota" },
   // L'id resta "ambra": e' quello gia' scritto nei localStorage dei browser,
   // cambiarlo farebbe ripartire tutti dal dark. Cambia solo il nome mostrato.
-  { id: "ambra",     nome: "Senape",         nota: "grigio caldo, senape su bordi e stati" },
+  { id: "ambra",     nome: "tema.ambra",     nota: "tema.ambra.nota" },
 ];
 
 function temaAttivo() {
   const el = document.documentElement;
-  const t = (el && el.getAttribute && el.getAttribute("data-tema")) || "";
-  return TEMI.some(x => x.id === t) ? t : "dark";
+  const id = (el && el.getAttribute && el.getAttribute("data-tema")) || "";
+  return TEMI.some(x => x.id === id) ? id : "dark";
 }
 
 function applicaTema(id) {
@@ -86,7 +91,7 @@ function applicaTema(id) {
   // Il localStorage puo' non esserci (finestra privata, storage bloccato): il
   // tema si applica lo stesso, semplicemente non sopravvive al ricaricamento.
   try { window.localStorage.setItem(TEMA_KEY, tema); }
-  catch (e) { console.warn("tema non salvato nel browser:", e.message); }
+  catch (e) { console.warn(t("tema.nonSalvato"), e.message); }
   ridisegnaTema();
   return tema;
 }
@@ -163,19 +168,19 @@ function apiBudget(url) {
 /* Causa e azione per ogni tipo di fallimento. Il `detail` del backend, quando
    c'e', si aggiunge: dice il caso specifico, non sostituisce la spiegazione. */
 const API_CAUSA = {
-  rete:      ["Backend non raggiungibile", "controlla che il servizio LANMng sia acceso"],
-  timeout:   ["Nessuna risposta entro il tempo massimo", "riprova, oppure guarda i log del servizio"],
-  sessione:  ["Sessione scaduta", "rifai l'accesso"],
-  vietato:   ["Operazione non consentita", ""],
-  csrf:      ["Richiesta rifiutata: origine non consentita", "apri la dashboard dall'indirizzo abituale"],
-  assente:   ["Non trovato", "l'oggetto puo' essere gia' stato rimosso"],
-  conflitto: ["Operazione gia' in corso", "attendi che finisca e riprova"],
-  invalido:  ["Dati non validi", "correggi i campi segnalati"],
-  limite:    ["Troppe richieste ravvicinate", "attendi qualche secondo"],
-  servizio:  ["Funzione non disponibile in questa configurazione", ""],
-  gateway:   ["Backend non disponibile", "e' in riavvio, oppure la richiesta ha superato il tempo massimo del proxy"],
-  server:    ["Errore interno del backend", "il motivo e' nei log del servizio"],
-  risposta:  ["Risposta non interpretabile", "ha risposto il proxy e non LANMng"],
+  rete:      ["err.rete", "err.rete.azione"],
+  timeout:   ["err.timeout", "err.timeout.azione"],
+  sessione:  ["err.sessione", "err.sessione.azione"],
+  vietato:   ["err.vietato", "err.vietato.azione"],
+  csrf:      ["err.csrf", "err.csrf.azione"],
+  assente:   ["err.assente", "err.assente.azione"],
+  conflitto: ["err.conflitto", "err.conflitto.azione"],
+  invalido:  ["err.invalido", "err.invalido.azione"],
+  limite:    ["err.limite", "err.limite.azione"],
+  servizio:  ["err.servizio", "err.servizio.azione"],
+  gateway:   ["err.gateway", "err.gateway.azione"],
+  server:    ["err.server", "err.server.azione"],
+  risposta:  ["err.risposta", "err.risposta.azione"],
 };
 
 /* Il 422 di FastAPI rompe la convenzione: `detail` e' una lista di oggetti e
@@ -205,10 +210,11 @@ function apiClassifica(status, detail) {
 }
 
 function apiErrore(kind, status, detail, extra = {}) {
-  const [causa, azione] = API_CAUSA[kind] || API_CAUSA.server;
+  const [kCausa, kAzione] = API_CAUSA[kind] || API_CAUSA.server;
+  const causa = t(kCausa), azione = kAzione ? t(kAzione) : "";
   const messaggio = causa
     + (detail ? " — " + detail : "")
-    + (extra.retryAfter ? `. Riprova fra ${extra.retryAfter}s.`
+    + (extra.retryAfter ? ". " + t("err.riprovaFra", { n: extra.retryAfter })
        : azione ? ". " + azione + "." : "");
   return {
     ok: false, status, data: extra.data || {},
@@ -382,8 +388,8 @@ function formLogin(box, opt = {}) {
   return new Promise((resolve) => {
     box.innerHTML = `<form class="controls" style="margin:0">
       <input type="password" class="lg-pass" placeholder="password admin" autocomplete="current-password">
-      <button class="btn" type="submit" style="border-color:var(--teal);color:var(--teal)">Entra</button>
-      ${opt.annulla ? `<button class="btn lg-no" type="button">Annulla</button>` : ""}
+      <button class="btn" type="submit" style="border-color:var(--teal);color:var(--teal)">${h(t("login.entra"))}</button>
+      ${opt.annulla ? `<button class="btn lg-no" type="button">${h(t("comune.annulla"))}</button>` : ""}
       </form><div class="lg-note"></div>`;
     const form = box.querySelector("form");
     const nota = box.querySelector(".lg-note");
@@ -417,18 +423,16 @@ async function pannelloLogin() {
   const chiudi = (v, risolvi) => { ov.remove(); risolvi(v); };
   return new Promise((resolve) => {
     if (stato === "offline") {
-      ov.innerHTML = `<div class="modal"><h3>Accesso non verificabile</h3>
+      ov.innerHTML = `<div class="modal"><h3>${h(t("sicurezza.accessoNonVerificabile"))}</h3>
         ${noteErrore(esito.error)}
-        <div class="modal-actions"><button class="btn lg-close">Chiudi</button></div></div>`;
+        <div class="modal-actions"><button class="btn lg-close">${h(t("comune.chiudi"))}</button></div></div>`;
     } else if (stato === "senza-password") {
-      ov.innerHTML = `<div class="modal"><h3>Password admin mancante</h3>
-        <div class="muted">Impostane una in Impostazioni: senza, le operazioni che
-        richiedono una sessione restano chiuse.</div>
-        <div class="modal-actions"><button class="btn lg-close">Chiudi</button></div></div>`;
+      ov.innerHTML = `<div class="modal"><h3>${h(t("sicurezza.passwordMancante"))}</h3>
+        <div class="muted">${h(t("sicurezza.impostaneUna"))}</div>
+        <div class="modal-actions"><button class="btn lg-close">${h(t("comune.chiudi"))}</button></div></div>`;
     } else {
-      ov.innerHTML = `<div class="modal"><h3>Sessione scaduta</h3>
-        <div class="muted" style="margin-bottom:12px">Rientra per riprendere da dove eri:
-        l'operazione interrotta viene ripetuta da sola.</div>
+      ov.innerHTML = `<div class="modal"><h3>${h(t("sicurezza.sessioneScaduta"))}</h3>
+        <div class="muted" style="margin-bottom:12px">${h(t("sicurezza.rientra"))}</div>
         <div class="lg-box"></div></div>`;
       formLogin(ov.querySelector(".lg-box"), { annulla: true })
         .then((v) => chiudi(v, resolve));
@@ -487,15 +491,14 @@ async function diagnosticaWS() {
   if (!st.data.session) {
     const dentro = await chiediLogin();
     if (dentro) { wsTentativo = 0; wsDiagnosticato = false; connectWS(); return; }
-    toast("Aggiornamenti live fermi: serve una sessione.",
+    toast(t("msg.wsSessione"),
           { level: "warn", durata: 0, chiave: "ws-sessione",
-            azione: { label: "Rientra", onclick: () => { wsTentativo = 0; connectWS(); } } });
+            azione: { label: t("comune.rientra"), onclick: () => { wsTentativo = 0; connectWS(); } } });
     return;
   }
-  toast("Il servizio risponde e la sessione e' valida, ma gli aggiornamenti live non "
-        + "partono: controlla che il proxy inoltri /ws al backend.",
+  toast(t("msg.wsNonParte"),
         { level: "warn", durata: 0, chiave: "ws-percorso",
-          azione: { label: "Riprova", onclick: () => { wsTentativo = 0; wsDiagnosticato = false; connectWS(); } } });
+          azione: { label: t("azione.riprova"), onclick: () => { wsTentativo = 0; wsDiagnosticato = false; connectWS(); } } });
 }
 
 function connectWS() {
@@ -517,8 +520,7 @@ function connectWS() {
     if (motivo === "origine") {
       // Insistere e' inutile: e' una configurazione sbagliata, non un guasto.
       wsProssimo = 0;
-      toast("Aggiornamenti live rifiutati: origine non consentita. Apri la dashboard "
-            + "dall'indirizzo abituale.", { level: "err", durata: 0, chiave: "ws-origine" });
+      toast(t("msg.wsOrigine"), { level: "err", durata: 0, chiave: "ws-origine" });
       aggiornaStatoConnessione();
       return;
     }
@@ -532,9 +534,9 @@ function connectWS() {
         // Rinunciando al login non si riconnette da soli: senza questo avviso
         // l'indicatore resterebbe "offline" per sempre e l'unica via d'uscita
         // sarebbe ricaricare la pagina, senza sapere perche'.
-        toast("Aggiornamenti live fermi: serve una sessione.",
+        toast(t("msg.wsSessione"),
               { level: "warn", durata: 0, chiave: "ws-sessione",
-                azione: { label: "Rientra", onclick: () => { wsTentativo = 0; connectWS(); } } });
+                azione: { label: t("comune.rientra"), onclick: () => { wsTentativo = 0; connectWS(); } } });
       });
       return;
     }
@@ -611,6 +613,20 @@ function aggiornaStatoConnessione() {
 }
 
 /* Chiamata ad ogni snapshot/update: aggiorna chrome + pagina attiva. */
+/* Lingua predefinita del servizio (config `ui.default_language`).
+
+   Si applica SOLO a chi non ha gia' scelto nel proprio browser: il contrario —
+   la config che scavalca la scelta — farebbe cambiare lingua sotto le mani ad
+   ogni ricaricamento, senza che si capisca perche'. */
+function applicaLinguaPredefinita(meta) {
+  const lingua = (meta || {}).default_language;
+  if (!lingua || I18N.sceltaEsplicita || lingua === I18N.lang) return false;
+  I18N.lang = lingua;
+  if (document.documentElement) document.documentElement.lang = lingua;
+  I18N.applicaStatico();
+  return true;
+}
+
 function onData() {
   const s = state.snap;
   aggiornaStatoConnessione();
@@ -633,31 +649,32 @@ function onData() {
   aggiornaBoxAlert();
   // Lo stato di sicurezza ora e' nello snapshot: prima era una fotografia
   // scattata al boot, e chiudere la falla dalla UI non spegneva il banner.
+  applicaLinguaPredefinita(s.meta);
   if (Array.isArray(s.security)) renderSecurityBanner(s.security);
   renderIfLive();
 }
 
 /* ── Router ───────────────────────────────────────────────────────── */
 const PAGES = {
-  dashboard: { title: "Dashboard", render: pageDashboard, refresh: refreshDashboard },
+  dashboard: { title: "pagina.dashboard", render: pageDashboard, refresh: refreshDashboard },
   // refresh: aggiornamento parziale sugli update live (vedi renderIfLive), cosi'
   // i controlli restano in piedi e chi sta scrivendo nel filtro non perde il cursore.
-  devices:   { title: "Dispositivi", render: pageDevices, refresh: refreshDevices },
+  devices:   { title: "pagina.devices", render: pageDevices, refresh: refreshDevices },
   // Sezione monitoraggio: due sotto-tab (Servizi | Risorse) sotto la stessa
   // voce di menu. `nav` dice quale voce di sidebar resta accesa.
-  services:  { title: "Monitoraggio · Servizi", render: pageServices,
+  services:  { title: "pagina.services", render: pageServices,
                refresh: refreshServices, nav: "services" },
-  resources: { title: "Monitoraggio · Risorse", render: pageResources,
+  resources: { title: "pagina.resources", render: pageResources,
                refresh: refreshResources, nav: "services" },
-  wireguard: { title: "WireGuard VPN", render: pageWireGuard, refresh: refreshWireGuard },
-  stats:     { title: "Stats & Traffico", render: pageStats, refresh: refreshStats },
-  wan:       { title: "WAN", render: pageWan, refresh: refreshWan },
+  wireguard: { title: "pagina.wireguard", render: pageWireGuard, refresh: refreshWireGuard },
+  stats:     { title: "pagina.stats", render: pageStats, refresh: refreshStats },
+  wan:       { title: "pagina.wan", render: pageWan, refresh: refreshWan },
   // logs: on-demand, non si auto-rigenera ad ogni update (preserva i filtri).
-  logs:      { title: "Logs", render: pageLogs, live: false },
-  tools:     { title: "Tools di rete", render: pageTools, live: false },
-  host:      { title: "Host di LANMng", render: pageHost, live: false },
-  terminal:  { title: "Terminale SSH", render: pageTerminal, live: false },
-  settings:  { title: "Impostazioni", render: pageSettings, live: false },
+  logs:      { title: "pagina.logs", render: pageLogs, live: false },
+  tools:     { title: "pagina.tools", render: pageTools, live: false },
+  host:      { title: "pagina.host", render: pageHost, live: false },
+  terminal:  { title: "pagina.terminal", render: pageTerminal, live: false },
+  settings:  { title: "pagina.settings", render: pageSettings, live: false },
 };
 
 function go(route) {
@@ -665,7 +682,7 @@ function go(route) {
   // Uscire da Impostazioni con l'editor modificato buttava via il lavoro senza
   // dire niente: la pagina si ridisegna da capo alla prossima visita.
   if (state.route === "settings" && route !== "settings" && cfgSporco()
-      && !confirm("Ci sono modifiche non salvate nella configurazione. Uscire lo stesso?"))
+      && !confirm(t("chiedi.uscireSenzaSalvare")))
     return;
   if (route !== "devices") stopMap();
   if (route !== "terminal") stopTerminal();
@@ -680,7 +697,7 @@ function go(route) {
   const navRoute = PAGES[route].nav || route;
   document.querySelectorAll("#nav a").forEach(a =>
     a.classList.toggle("active", a.dataset.route === navRoute));
-  $("#page-title").textContent = PAGES[route].title;
+  $("#page-title").textContent = t(PAGES[route].title);
   renderRoute();
 }
 function renderRoute() {
@@ -714,7 +731,7 @@ function setNavOpen(open) {
   const btn = $("#nav-toggle");
   if (btn) {
     btn.setAttribute("aria-expanded", open ? "true" : "false");
-    btn.setAttribute("aria-label", open ? "Chiudi il menu" : "Apri il menu");
+    btn.setAttribute("aria-label", open ? t("topbar.chiudiMenu") : t("topbar.apriMenu"));
   }
   // Il fuoco segue il drawer: aperto va sulla voce attiva, chiuso torna
   // all'hamburger — ma solo se stava dentro il drawer, altrimenti navigare
@@ -787,18 +804,18 @@ function aggiornaNoteSorgente(nomi) {
 function notaSorgenteHtml(nome) {
   const s = (state.snap.sources || {})[nome];
   if (!s || s.ok) return "";
-  return `<div class="cfg-note err">${h(s.error || "sorgente non raggiungibile")}${
-    s.ts ? ` · ultimo dato valido ${h(ago(s.ts))}` : " · nessun dato mai raccolto"}</div>`;
+  return `<div class="cfg-note err">${h(s.error || t("comune.sorgenteNonRaggiungibile"))}${
+    s.ts ? h(t("comune.ultimoDatoValido", { q: ago(s.ts) })) : h(t("comune.nessunDatoMaiRaccolto"))}</div>`;
 }
 
 /* `o` e' facoltativo, cosi' le KPI delle altre pagine restano com'erano:
      dot  pallino di stato accanto al numero (s-on/s-warn/s-down/s-off)
-     ctx  riga di contesto sotto l'etichetta ("3 offline", "tutti attivi")
+     ctx  riga di contesto sotto l'etichetta ("3 offline", t("stato.tuttiAttivi"))
      vai  rotta di destinazione: rende la card cliccabile (delegation in bindAlert) */
 /* L'etichetta sta SOPRA il valore: dice cosa stai per leggere prima che tu lo
    legga, invece di farlo indovinare dal numero e spiegarlo dopo. */
 function kpi(val, sub, cls = "", o = {}) {
-  const vai = o.vai ? ` data-vai="${h(o.vai)}" title="vai a ${h((PAGES[o.vai] || {}).title || o.vai)}"` : "";
+  const vai = o.vai ? ` data-vai="${h(o.vai)}" title="${h(t("azione.vaiA", { dove: (PAGES[o.vai] ? t(PAGES[o.vai].title) : o.vai) }))}"` : "";
   return `<div class="card kpi${o.vai ? " clic" : ""}"${vai}>
     <div class="sub">${h(sub)}</div>
     <div class="val ${cls}">${o.dot ? `<span class="status-dot ${h(o.dot)}"></span>` : ""}${val}</div>
@@ -842,11 +859,11 @@ function alertRiga(a) {
   return `<div class="alert-riga ${h(a.level)}">
     <span class="status-dot ${dot}"></span>
     <div class="alert-testo">
-      <b>${h(a.title)}</b> <span class="muted">· da ${h(durata(a.since))}</span>
+      <b>${h(a.title)}</b> <span class="muted">· ${h(t("tempo.da", { v: durata(a.since) }))}</span>
       <div>${h(a.detail)}</div>
       ${a.action ? `<div class="alert-azione">${h(a.action)}</div>` : ""}
     </div>
-    <button class="iconbtn" title="Silenzia per sempre (con motivo)"
+    <button class="iconbtn" title="${h(t("alert.silenziaPerSempre"))}"
       data-silenzia="${h(a.rule)}" data-soggetto="${h(a.subject)}">${ICONA_SILENZIA}</button>
   </div>`;
 }
@@ -893,10 +910,10 @@ function bindAlert() {
     // che si apre in una scheda nuova): senza questa guardia il clic aprirebbe
     // la scheda E cambierebbe pagina sotto, lasciando la dashboard altrove.
     if (e.target.closest("a[href]")) return;
-    const t = e.target.closest("[data-silenzia],[data-vai]");
-    if (!t) return;
-    if (t.dataset.silenzia) return openSilenceModal(t.dataset.silenzia, t.dataset.soggetto || "");
-    go(t.dataset.vai);
+    const bersaglio = e.target.closest("[data-silenzia],[data-vai]");
+    if (!bersaglio) return;
+    if (bersaglio.dataset.silenzia) return openSilenceModal(bersaglio.dataset.silenzia, bersaglio.dataset.soggetto || "");
+    go(bersaglio.dataset.vai);
   });
 }
 
@@ -906,19 +923,19 @@ function openSilenceModal(rule, subject) {
   const ov = document.createElement("div");
   ov.className = "modal-ov";
   ov.innerHTML = `<div class="modal">
-    <h3>Silenzia questo avviso</h3>
+    <h3>${h(t("alert.silenziaTitolo"))}</h3>
     <div class="muted" style="font-size:12px;margin-bottom:10px">
       Non suonera' piu', per sempre, finche' non lo riattivi da
       Impostazioni → Alert silenziati. Il salvataggio riscrive
       <code>config.yaml</code> (con backup automatico) perdendone i commenti.
     </div>
-    <label>Regola<input type="text" value="${h(rule)}" disabled></label>
-    <label>Soggetto<input type="text" value="${h(subject || "(tutta la regola)")}" disabled></label>
-    <label>Motivo<input type="text" id="sl-reason" placeholder="es. le due schede sono volute"></label>
+    <label>${h(t("alert.regola"))}<input type="text" value="${h(rule)}" disabled></label>
+    <label>${h(t("alert.soggetto"))}<input type="text" value="${h(subject || t("alert.tuttaLaRegola"))}" disabled></label>
+    <label>${h(t("alert.motivo"))}<input type="text" id="sl-reason" placeholder="${h(t("alert.motivoEsempio"))}"></label>
     <div id="sl-msg" class="cfg-note err" style="display:none"></div>
     <div class="modal-actions">
-      <button class="btn" id="sl-cancel">Annulla</button>
-      <button class="btn" id="sl-save" style="border-color:var(--teal);color:var(--teal)">Silenzia</button>
+      <button class="btn" id="sl-cancel">${h(t("comune.annulla"))}</button>
+      <button class="btn" id="sl-save" style="border-color:var(--teal);color:var(--teal)">${h(t("alert.silenzia"))}</button>
     </div></div>`;
   document.body.appendChild(ov);
   const close = () => ov.remove();
@@ -930,7 +947,7 @@ function openSilenceModal(rule, subject) {
     const reason = campo.value.trim();
     const msg = $("#sl-msg", ov);
     if (!reason) {
-      msg.textContent = "Scrivi il motivo: fra sei mesi servira' a capire perche' questo avviso non suona piu'.";
+      msg.textContent = t("alert.serveMotivo");
       msg.style.display = "";
       return;
     }
@@ -938,7 +955,7 @@ function openSilenceModal(rule, subject) {
     if (!r.ok) { msg.textContent = r.error.messaggio; msg.style.display = ""; return; }
     close();
     // Nessun "riavvia il servizio": la sezione viene riletta dal file.
-    toast("Avviso silenziato: sparisce entro pochi secondi.", { level: "ok" });
+    toast(t("msg.avvisoSilenziato"), { level: "ok" });
   };
 }
 
@@ -946,8 +963,11 @@ function openSilenceModal(rule, subject) {
 
 /* "1 non rispondono" si legge sbagliato, e su una dashboard che si guarda ogni
    giorno si nota ogni volta. Con uno solo si usa il singolare. */
-function conta(n, uno, molti) {
-  return `${n} ${n === 1 ? uno : molti}`;
+/* Plurale dal catalogo: `chiave_one` / `chiave_other`, scelti con
+   Intl.PluralRules. Prima le due forme erano scritte a ogni chiamata, quindi
+   ogni lingua nuova avrebbe richiesto di toccare tutte e tredici. */
+function conta(n, chiave) {
+  return tp(chiave, n);
 }
 
 /* La fascia in alto. Ogni riquadro dice tre cose: quanti, di quanti, e cosa
@@ -965,15 +985,15 @@ function dashKpi(s) {
     ${kpi(`${dev.online ?? "–"}<span class="unit">/${dev.total ?? "–"}</span>`,
       "dispositivi online", attesaDev ? "" : "green",
       { dot: attesaDev ? "s-off" : "s-on", vai: "devices",
-        ctx: attesaDev ? "in attesa…" : (dev.offline ? conta(dev.offline, "spento", "spenti") : "tutti accesi") })}
+        ctx: attesaDev ? t("stato.inAttesa") : (dev.offline ? conta(dev.offline, "conta.spento") : t("stato.tuttiAccesi")) })}
     ${kpi(`${svc.ok ?? "–"}<span class="unit">/${svc.total ?? "–"}</span>`,
       "servizi attivi", attesaSvc ? "" : (svc.down ? "orange" : "green"),
       { dot: attesaSvc ? "s-off" : (svc.down ? "s-down" : "s-on"), vai: "services",
-        ctx: attesaSvc ? "in attesa…" : (svc.down ? conta(svc.down, "non risponde", "non rispondono") : "tutti attivi") })}
+        ctx: attesaSvc ? t("stato.inAttesa") : (svc.down ? conta(svc.down, "conta.nonRisponde") : t("stato.tuttiAttivi")) })}
     ${kpi(`${wg.active_peers ?? "–"}<span class="unit">/${wg.total_peers ?? "–"}</span>`,
       "peer WireGuard", wg.active_peers ? "green" : "",
       { dot: wg.active_peers ? "s-on" : "s-off", vai: "wireguard",
-        ctx: wg.total_peers == null ? "" : (wgGiu ? conta(wgGiu, "non connesso", "non connessi") : "tutti connessi") })}
+        ctx: wg.total_peers == null ? "" : (wgGiu ? conta(wgGiu, "conta.nonConnesso") : t("stato.tuttiConnessi")) })}
     ${dashKpiWan(wan)}`;
 }
 
@@ -1017,7 +1037,7 @@ function dashTrafficoNum(s) {
 function wgMini(s) {
   const wg = s.wireguard || {};
   const peers = (wg.interfaces || []).flatMap(i => i.peers || []);
-  if (!peers.length) return `<div class="empty">Nessun peer configurato.</div>`;
+  if (!peers.length) return `<div class="empty">${h(t("wg.nessunPeer"))}</div>`;
   // Prima chi non e' connesso, poi per nome: stesso criterio dei servizi.
   const righe = peers.slice().sort((a, b) =>
     ((a.status === "active") === (b.status === "active") ? 0 : a.status === "active" ? 1 : -1) ||
@@ -1026,7 +1046,7 @@ function wgMini(s) {
     const su = p.status === "active";
     return `<tr data-vai="wireguard" style="cursor:pointer" title="apri WireGuard">
       <td><span class="status-dot ${su ? "s-on" : "s-warn"}"></span>${h(nomePeer(p))}
-        <div class="muted mono" style="font-size:11px">${h(p.endpoint || "nessun endpoint")}</div></td>
+        <div class="muted mono" style="font-size:11px">${h(p.endpoint || t("wg.nessunEndpoint"))}</div></td>
       <td class="right mono muted nowrap" style="font-size:11px">
         ↓ ${h(fmtMB(p.rx_mb))}<br>↑ ${h(fmtMB(p.tx_mb))}</td>
       <td class="right nowrap"><span class="chip ${su ? "ok" : "ignoto"}"
@@ -1039,10 +1059,10 @@ function dashRouter(s) {
   const sys = s.system || {};
   if (!sys.hostname) return `<div class="empty">In attesa dati router…</div>`;
   return `<table><tbody>
-    <tr><td class="muted">Modello</td><td class="mono">${h(sys.model)}</td></tr>
+    <tr><td class="muted">${h(t("host.modello"))}</td><td class="mono">${h(sys.model)}</td></tr>
     <tr><td class="muted">OS</td><td class="mono">${h(sys.os_version)}</td></tr>
-    <tr><td class="muted">Uptime</td><td class="mono">${h(sys.uptime_human)}</td></tr>
-    <tr><td class="muted">Load</td><td class="mono">${(sys.load || []).map(x => x.toFixed(2)).join("  ")}</td></tr>
+    <tr><td class="muted">${h(t("host.uptime"))}</td><td class="mono">${h(sys.uptime_human)}</td></tr>
+    <tr><td class="muted">${h(t("host.load"))}</td><td class="mono">${(sys.load || []).map(x => x.toFixed(2)).join("  ")}</td></tr>
     <tr><td class="muted">RAM</td><td class="mono">${sys.memory_used_pct}% di ${sys.memory_total_mb} MB</td></tr>
   </tbody></table>`;
 }
@@ -1054,7 +1074,7 @@ function dashRouter(s) {
 function dashAlertBox(s) {
   const a = s.alerts || [];
   if (!a.length) return "";
-  return card("Alert", alertIndice(a), alertConteggi(s));
+  return card(t("alert.titolo"), alertIndice(a), alertConteggi(s));
 }
 
 function pageDashboard(view, s) {
@@ -1062,17 +1082,17 @@ function pageDashboard(view, s) {
     <div id="dash-alerts">${dashAlertBox(s)}</div>
     <div class="grid cols-4" style="margin-bottom:14px" id="dash-kpi">${dashKpi(s)}</div>
     <div class="grid cols-2-1" style="margin-bottom:14px">
-      ${card("Traffico WAN", `<canvas class="chart tall" id="dash-traffic"></canvas>
+      ${card(t("dash.trafficoWan"), `<canvas class="chart tall" id="dash-traffic"></canvas>
         ${notaSorgente("traffic")}
         <div class="rates" id="dash-traffico-num">${dashTrafficoNum(s)}</div>`,
         `<span id="dash-traffico-testa">${dashTrafficoTesta(s)}</span>`)}
-      ${card("Peer WireGuard", `<div id="dash-wg">${wgMini(s)}</div>`,
+      ${card(t("dash.peerWireguard"), `<div id="dash-wg">${wgMini(s)}</div>`,
         `<span class="muted" data-vai="wireguard" style="cursor:pointer">dettagli →</span>`)}
     </div>
     <div class="grid cols-2-1">
-      ${card("Servizi in evidenza", `<div id="dash-svc">${servicesMini(s)}</div>`,
+      ${card(t("dash.serviziInEvidenza"), `<div id="dash-svc">${servicesMini(s)}</div>`,
         `<span class="muted" data-vai="services" style="cursor:pointer">gestisci →</span>`)}
-      ${card("Sistema router", `<div id="dash-sys">${dashRouter(s)}</div>`,
+      ${card(t("dash.sistemaRouter"), `<div id="dash-sys">${dashRouter(s)}</div>`,
         `<span id="dash-sys-testa">${dashRouterTesta()}</span>`)}
     </div>`;
   drawTrafficChart($("#dash-traffic"), s.traffic_series || []);
@@ -1121,13 +1141,13 @@ function refreshDashboard(view, s) {
    E' l'unico punto in cui compaiono anche gli avvisi di sicurezza, perche' e'
    da qui che si trovano. */
 function alertIndice(alerts) {
-  if (!alerts.length) return `<div class="empty">Nessun alert. Tutto ok.</div>`;
+  if (!alerts.length) return `<div class="empty">${h(t("alert.nessuno"))}</div>`;
   return `<table><tbody>${alerts.map(a => {
     const dot = a.level === "critical" ? "s-down" : a.level === "warn" ? "s-warn" : "s-off";
     return `<tr class="${a.level === "info" ? "" : "alert-row " + h(a.level)}" data-vai="${h(a.scope)}" style="cursor:pointer">
       <td><span class="status-dot ${dot}"></span>${h(a.title)}
         <div class="muted">${h(a.detail)}</div></td>
-      <td class="right muted nowrap">${h((PAGES[a.scope] || {}).title || a.scope)}<br>da ${h(durata(a.since))}</td>
+      <td class="right muted nowrap">${h(PAGES[a.scope] ? t(PAGES[a.scope].title) : a.scope)}<br>${h(t("tempo.da", { v: durata(a.since) }))}</td>
     </tr>`;
   }).join("")}</tbody></table>`;
 }
@@ -1166,10 +1186,10 @@ function statoLeggibile(x) {
     // Senza questo ramo la voce cadrebbe in fondo, fra gli healthcheck, e la
     // colonna direbbe "NaN ms" per un servizio che non ha nessuna latenza.
     if (!x.available) return "sconosciuto";
-    if (x.state === "not-found") return "non installato";
+    if (x.state === "not-found") return t("servizi.nonInstallato");
     return x.state === "running" ? "attivo" : "fermo";
   }
-  return x.ok ? `${Math.round(x.latency_ms)} ms` : "non risponde";
+  return x.ok ? `${Math.round(x.latency_ms)} ms` : t("servizi.nonRisponde");
 }
 
 /* Il chip dice lo stato in una parola; il motivo per esteso sta nel title,
@@ -1277,7 +1297,7 @@ function pageDevices(view, s) {
     <div class="controls">
       <input type="text" id="dq" placeholder="cerca nome / IP / MAC…" value="${h(devFilter.q)}">
       <select id="dsub">
-        <option value="">tutte le subnet</option>
+        <option value="">${h(t("device.tutteLeSubnet"))}</option>
         ${metaSubnets().map(s => `<option value="${h(s.label)}">${h(s.label)} · ${h(s.cidr)}</option>`).join("")}
       </select>
       <div class="seg" id="dstatus">
@@ -1382,19 +1402,19 @@ function renderDeviceList() {
   const c = $("#dcount");
   if (c) c.textContent = `${list.length} dispositivi` + (hiddenTot ? ` · ${hiddenTot} nascosti` : "");
   if (!list.length) {
-    box.innerHTML = `<div class="card"><div class="empty">Nessun dispositivo con questi filtri.</div></div>`;
+    box.innerHTML = `<div class="card"><div class="empty">${h(t("device.nessunoConFiltri"))}</div></div>`;
     return;
   }
   box.innerHTML = `<div class="card" style="padding:0"><table><thead><tr>
-      <th></th><th>Dispositivo</th><th>IP</th><th>MAC</th><th>Tipo / OS</th>
-      <th>Porte</th><th>Sorgenti</th><th>Stato</th><th></th>
+      <th></th><th>${h(t("device.colDispositivo"))}</th><th>IP</th><th>MAC</th><th>${h(t("device.colTipoOs"))}</th>
+      <th>${h(t("comune.porte"))}</th><th>${h(t("comune.sorgenti"))}</th><th>${h(t("comune.stato"))}</th><th></th>
     </tr></thead><tbody>${list.map(d => {
       const aperta = d.key === devFilter.detailKey;
       return `<tr class="dev-riga${aperta ? " aperta" : ""}"${d.hidden ? ' style="opacity:.5"' : ""}>
         <td class="apri"><button class="expand${aperta ? " open" : ""}" title="Dettagli"
           data-act="detail" data-key="${h(d.key)}">▸</button></td>
         <td><a href="#" class="link" data-act="detail" data-key="${h(d.key)}">${h(d.name)}</a>
-            ${safeHref(d.url) ? ` <a href="${h(safeHref(d.url))}" target="_blank" rel="noopener" title="Apri pannello">↗</a>` : ""}
+            ${safeHref(d.url) ? ` <a href="${h(safeHref(d.url))}" target="_blank" rel="noopener" title="${h(t("device.apriPannello"))}">↗</a>` : ""}
             ${d.hidden ? `<span class="tag">nascosto</span>` : ""}
             ${d.vendor ? `<div class="muted" style="font-size:11px">${h(d.vendor)}</div>` : ""}</td>
         <td class="mono">${(d.ips || []).map(h).join("<br>") || "—"}</td>
@@ -1405,12 +1425,12 @@ function renderDeviceList() {
         <td class="nowrap"><span class="status-dot ${d.online ? "s-on" : "s-off"}"></span>${d.online
           ? `online${d.latency_ms ? ` <span class="muted">${h(d.latency_ms)}ms</span>` : ""}` : "offline"}</td>
         <td class="nowrap right">
-          <button class="iconbtn" title="Analizza nei tools" data-act="probe" data-key="${h(d.key)}">⌖</button>
-          <button class="iconbtn" title="Modifica" data-act="edit" data-key="${h(d.key)}">✎</button>
+          <button class="iconbtn" title="${h(t("device.analizzaNeiTools"))}" data-act="probe" data-key="${h(d.key)}">⌖</button>
+          <button class="iconbtn" title="${h(t("comune.modifica"))}" data-act="edit" data-key="${h(d.key)}">✎</button>
           ${d.hidden
-            ? `<button class="iconbtn" title="Mostra di nuovo" data-act="unhide" data-key="${h(d.key)}">↺</button>`
-            : `<button class="iconbtn" title="Nascondi" data-act="hide" data-key="${h(d.key)}">⊘</button>`}
-          <button class="iconbtn" title="Rimuovi" data-act="delete" data-key="${h(d.key)}">✕</button>
+            ? `<button class="iconbtn" title="${h(t("device.mostraDiNuovo"))}" data-act="unhide" data-key="${h(d.key)}">↺</button>`
+            : `<button class="iconbtn" title="${h(t("comune.nascondi"))}" data-act="hide" data-key="${h(d.key)}">⊘</button>`}
+          <button class="iconbtn" title="${h(t("comune.rimuovi"))}" data-act="delete" data-key="${h(d.key)}">✕</button>
         </td>
       </tr>${aperta ? `<tr class="dev-scheda"><td colspan="9">${deviceCard(d)}</td></tr>` : ""}`;
     }).join("")}</tbody></table></div>`;
@@ -1426,22 +1446,22 @@ function deviceCard(d) {
   const row = (k, v) => v ? `<div class="kv"><span class="muted">${k}</span><span class="mono">${v}</span></div>` : "";
   return `<div class="dev-card">
     <div class="detail-grid">
-      ${row("Hostname", h(d.hostname))}
-      ${row("Nome", h(d.name))}
-      ${row("Tipo", h(d.type))}
+      ${row(t("comune.hostname"), h(d.hostname))}
+      ${row(t("comune.nome"), h(d.name))}
+      ${row(t("comune.tipo"), h(d.type))}
       ${row("MAC", h(d.mac))}
       ${row("IP", (d.ips || []).map(h).join(", "))}
-      ${row("Subnet", h(d.subnet))}
+      ${row(t("comune.subnet"), h(d.subnet))}
       ${row("OS", h(d.os))}
-      ${row("Vendor", h(d.vendor))}
-      ${row("Porte aperte", (d.open_ports || []).join(", "))}
-      ${row("Sorgenti", (d.discovered_by || []).join(", "))}
-      ${row("Servizi", (d.services || []).map(h).join(", "))}
-      ${row("Stato", d.online ? `online${d.latency_ms ? " · " + d.latency_ms + " ms" : ""}` : "offline")}
-      ${row(d.online ? "Acceso da" : "Spento da", daQuando(statiStorici.devices[d.key], d.online))}
-      ${row("Ultimo visto", d.last_seen ? ago(d.last_seen) : "mai")}
+      ${row(t("comune.vendor"), h(d.vendor))}
+      ${row(t("device.porteAperte"), (d.open_ports || []).join(", "))}
+      ${row(t("comune.sorgenti"), (d.discovered_by || []).join(", "))}
+      ${row(t("comune.servizi"), (d.services || []).map(h).join(", "))}
+      ${row(t("comune.stato"), d.online ? `online${d.latency_ms ? " · " + d.latency_ms + " ms" : ""}` : "offline")}
+      ${row(t(d.online ? "device.accesoDa" : "device.spentoDa"), daQuando(statiStorici.devices[d.key], d.online))}
+      ${row(t("device.ultimoVisto"), d.last_seen ? ago(d.last_seen) : "mai")}
       ${row("URL", d.url ? (safeHref(d.url) ? `<a href="${h(safeHref(d.url))}" target="_blank" rel="noopener">${h(d.url)}</a>` : h(d.url)) : "")}
-      ${d.notes ? `<div class="kv" style="grid-column:1/-1"><span class="muted">Note</span><span>${h(d.notes)}</span></div>` : ""}
+      ${d.notes ? `<div class="kv" style="grid-column:1/-1"><span class="muted">${h(t("comune.note"))}</span><span>${h(d.notes)}</span></div>` : ""}
     </div>
     ${ifaceSection(d)}
   </div>`;
@@ -1454,7 +1474,7 @@ function ifaceSection(d) {
   if (!ifaces.length)
     return `${titolo}<div class="muted" style="font-size:12px">Nessuna interfaccia rilevata:
       si leggono via SSH, quindi ci sono solo per gli host configurati in
-      <span class="link" data-vai="settings" style="cursor:pointer">Impostazioni → discovery.ssh</span>.</div>`;
+      <span class="link" data-vai="settings" style="cursor:pointer">${h(t("impostazioni.vaiDiscovery"))}</span>.</div>`;
   return `${titolo}<div class="iface-grid">${ifaces.map(ifaceCard).join("")}</div>`;
 }
 
@@ -1561,18 +1581,18 @@ function openEditModal(d, key) {
   const ov = document.createElement("div");
   ov.className = "modal-ov";
   ov.innerHTML = `<div class="modal">
-    <h3>Modifica dispositivo <span class="muted mono">${h(key)}</span></h3>
-    <label>Indirizzo IP<input type="text" id="m-ip" class="mono" value="${h((d.ips || [])[0] || "")}" placeholder="${h(esempioIP())}"></label>
+    <h3>${h(t("device.modificaTitolo"))} <span class="muted mono">${h(key)}</span></h3>
+    <label>${h(t("device.indirizzoIp"))}<input type="text" id="m-ip" class="mono" value="${h((d.ips || [])[0] || "")}" placeholder="${h(esempioIP())}"></label>
     <label>MAC<input type="text" id="m-mac" class="mono" value="${h(d.mac || "")}" placeholder="(facoltativo)"></label>
-    <label>Nome<input type="text" id="m-name" value="${h(d.name || "")}"></label>
-    <label>Tipo<select id="m-type">${types.map(t => `<option ${t === d.type ? "selected" : ""}>${t}</option>`).join("")}</select></label>
-    <label>Sistema operativo<input type="text" id="m-os" value="${h(d.os || "")}"></label>
+    <label>${h(t("comune.nome"))}<input type="text" id="m-name" value="${h(d.name || "")}"></label>
+    <label>${h(t("comune.tipo"))}<select id="m-type">${types.map(t => `<option ${t === d.type ? "selected" : ""}>${t}</option>`).join("")}</select></label>
+    <label>${h(t("comune.sistemaOperativo"))}<input type="text" id="m-os" value="${h(d.os || "")}"></label>
     <label>URL pannello<input type="text" id="m-url" value="${h(d.url || "")}" placeholder="http://..."></label>
-    <label>Note<input type="text" id="m-notes" value="${h(d.notes || "")}"></label>
+    <label>${h(t("comune.note"))}<input type="text" id="m-notes" value="${h(d.notes || "")}"></label>
     <div id="m-msg" class="cfg-note err" style="display:none"></div>
     <div class="modal-actions">
-      <button class="btn" id="m-cancel">Annulla</button>
-      <button class="btn" id="m-save" style="border-color:var(--teal);color:var(--teal)">Salva</button>
+      <button class="btn" id="m-cancel">${h(t("comune.annulla"))}</button>
+      <button class="btn" id="m-save" style="border-color:var(--teal);color:var(--teal)">${h(t("comune.salva"))}</button>
     </div></div>`;
   document.body.appendChild(ov);
   const close = () => ov.remove();
@@ -1605,19 +1625,19 @@ function openAddModal() {
   const ov = document.createElement("div");
   ov.className = "modal-ov";
   ov.innerHTML = `<div class="modal">
-    <h3>Aggiungi dispositivo</h3>
-    <div class="muted" style="font-size:12px;margin-bottom:8px">Serve almeno un MAC o un IP. Compare anche se spento.</div>
+    <h3>${h(t("device.aggiungiTitolo"))}</h3>
+    <div class="muted" style="font-size:12px;margin-bottom:8px">${h(t("device.serveMacOIp"))}</div>
     <label>MAC<input type="text" id="a-mac" placeholder="AA:BB:CC:DD:EE:FF"></label>
     <label>IP<input type="text" id="a-ip" placeholder="${h(esempioIP())}"></label>
-    <label>Nome<input type="text" id="a-name"></label>
-    <label>Tipo<select id="a-type">${types.map(t => `<option>${t}</option>`).join("")}</select></label>
-    <label>Sistema operativo<input type="text" id="a-os"></label>
+    <label>${h(t("comune.nome"))}<input type="text" id="a-name"></label>
+    <label>${h(t("comune.tipo"))}<select id="a-type">${types.map(t => `<option>${t}</option>`).join("")}</select></label>
+    <label>${h(t("comune.sistemaOperativo"))}<input type="text" id="a-os"></label>
     <label>URL pannello<input type="text" id="a-url" placeholder="http://..."></label>
-    <label>Note<input type="text" id="a-notes"></label>
+    <label>${h(t("comune.note"))}<input type="text" id="a-notes"></label>
     <div id="a-msg" class="cfg-note err" style="display:none"></div>
     <div class="modal-actions">
-      <button class="btn" id="a-cancel">Annulla</button>
-      <button class="btn" id="a-save" style="border-color:var(--teal);color:var(--teal)">Aggiungi</button>
+      <button class="btn" id="a-cancel">${h(t("comune.annulla"))}</button>
+      <button class="btn" id="a-save" style="border-color:var(--teal);color:var(--teal)">${h(t("comune.aggiungi"))}</button>
     </div></div>`;
   document.body.appendChild(ov);
   const close = () => ov.remove();
@@ -1629,7 +1649,7 @@ function openAddModal() {
       name: $("#a-name", ov).value, type: $("#a-type", ov).value,
       os: $("#a-os", ov).value, url: $("#a-url", ov).value, notes: $("#a-notes", ov).value,
     };
-    if (!body.mac && !body.ip) { const m = $("#a-msg", ov); m.textContent = "Inserisci almeno un MAC o un IP."; m.style.display = ""; return; }
+    if (!body.mac && !body.ip) { const m = $("#a-msg", ov); m.textContent = t("device.inserisciMacOIp"); m.style.display = ""; return; }
     const r = await api("/api/devices/", { method: "POST", body });
     if (!r.ok) {
       const m = $("#a-msg", ov);
@@ -1642,7 +1662,7 @@ function openAddModal() {
     // riuscita, ma senza avviso il device sembrerebbe non essersi popolato.
     const sc = await api("/api/devices/scan", { method: "POST" });
     if (!sc.ok && sc.error.kind !== "limite")
-      toast("Dispositivo aggiunto, ma la scansione non e' partita: " + sc.error.messaggio,
+      toast(t("msg.scanNonPartita") + sc.error.messaggio,
             { level: "warn", chiave: "scan-dopo-aggiunta" });
   };
 }
@@ -1653,7 +1673,7 @@ function openAddModal() {
 function monitorTabs(active) {
   return `<div class="subtabs-bar">
     <div class="seg subtabs" id="mon-tabs">
-      ${[["services", "Servizi"], ["resources", "Risorse"]].map(([r, lbl]) =>
+      ${[["services", "comune.servizi"], ["resources", "comune.risorse"]].map(([r, lbl]) =>
         `<button data-tab="${r}"${active === r ? ' class="active"' : ""}>${lbl}</button>`).join("")}
     </div>
     <span class="muted mono" id="mon-eta" title="tempo al prossimo aggiornamento automatico"></span>
@@ -1743,7 +1763,7 @@ async function monitorRefreshNow() {
    se lo storico non sa ancora nulla di lui. */
 function giuDa(kind, host, name) {
   const q = daQuando(statiStorici.services[`${kind}\u0000${host || ""}\u0000${name}`], false);
-  return q ? `<span class="tag">giu' da ${h(q)}</span>` : "";
+  return q ? `<span class="tag">${h(t("servizi.giuDa", { q }))}</span>` : "";
 }
 
 /* Le quattro tabelle stanno in funzioni a se': la pagina si aggiorna per parti
@@ -1759,15 +1779,15 @@ function svcKpi(s) {
     ${kpi(`${sum.ok ?? "–"}<span class="unit">/${sum.total ?? "–"}</span>`, "servizi ok",
       sum.total == null ? "" : (sum.down ? "orange" : "green"),
       { dot: sum.total == null ? "s-off" : (sum.down ? "s-down" : "s-on"), vai: "services",
-        ctx: sum.total == null ? "in attesa…" : (sum.down ? conta(sum.down, "non risponde", "non rispondono") : "tutti attivi") })}
+        ctx: sum.total == null ? t("stato.inAttesa") : (sum.down ? conta(sum.down, "conta.nonRisponde") : t("stato.tuttiAttivi")) })}
     ${kpi(`${dk.running ?? "–"}<span class="unit">/${dk.total ?? "–"}</span>`, "container running", "",
-      { ctx: dk.total == null ? "" : conta(dk.stopped || 0, "fermo", "fermi") })}
+      { ctx: dk.total == null ? "" : conta(dk.stopped || 0, "conta.fermo") })}
     ${kpi(`${suHost.filter(u => u.ok).length}<span class="unit">/${suHost.length}</span>`,
       "servizi host attivi", "",
-      { ctx: conta(suHost.filter(u => u.critical).length, "critico", "critici") })}
+      { ctx: conta(suHost.filter(u => u.critical).length, "conta.critico") })}
     ${kpi(`${health.filter(c => c.ok).length}<span class="unit">/${health.length}</span>`,
       "healthcheck up", health.some(c => !c.ok) ? "orange" : "",
-      { ctx: health.length ? "" : "nessuno configurato" })}`;
+      { ctx: health.length ? "" : t("servizi.nessunoConfigurato") })}`;
 }
 
 function svcDocker(s) {
@@ -1777,9 +1797,9 @@ function svcDocker(s) {
     (svc.docker?.hosts || []).map(x => x.reachable === false
       ? `<span class="err" title="${h(x.error || "")}">${h(x.name)} (non risponde)</span>`
       : h(x.name)).join(" · ") || "—"}</div>`;
-  if (!containers.length) return `<div class="empty">Nessun container.</div>${host}`;
+  if (!containers.length) return `<div class="empty">${h(t("servizi.nessunContainer"))}</div>${host}`;
   return `<table><thead><tr>
-      <th>Container</th><th>Host</th><th>Stato</th><th>CPU</th><th>RAM</th><th>Porte</th><th></th></tr></thead><tbody>
+      <th>${h(t("servizi.colContainer"))}</th><th>${h(t("comune.host"))}</th><th>${h(t("comune.stato"))}</th><th>CPU</th><th>RAM</th><th>${h(t("comune.porte"))}</th><th></th></tr></thead><tbody>
       ${containers.map(c => `<tr>
         <td>${safeHref(c.url) ? `<a href="${h(safeHref(c.url))}" target="_blank" rel="noopener">${h(c.label)}</a>` : h(c.label)}
           ${c.pinned ? `<span class="tag teal">pin</span>` : ""}
@@ -1792,14 +1812,14 @@ function svcDocker(s) {
         <td class="mono">${c.running ? fmtMB(c.mem_usage_mb) : "—"}</td>
         <td class="mono muted" style="font-size:11px">${(c.ports || []).map(h).join("<br>") || "—"}</td>
         <td class="right nowrap">${c.pinned
-          ? `<button class="iconbtn" title="Modifica pin" data-svc-edit="${h(c.name)}" data-kind="docker">✎</button><button class="iconbtn" title="Rimuovi pin" data-svc-del="${h(c.name)}" data-kind="docker">✕</button>`
-          : `<button class="iconbtn" title="Dai un nome, un URL e la scelta per la dashboard" data-svc-pin="${h(c.name)}">+</button>`}</td>
+          ? `<button class="iconbtn" title="${h(t("servizi.modificaPin"))}" data-svc-edit="${h(c.name)}" data-kind="docker">✎</button><button class="iconbtn" title="${h(t("servizi.rimuoviPin"))}" data-svc-del="${h(c.name)}" data-kind="docker">✕</button>`
+          : `<button class="iconbtn" title="${h(t("servizi.dammiNomeUrl"))}" data-svc-pin="${h(c.name)}">+</button>`}</td>
       </tr>`).join("")}</tbody></table>${host}`;
 }
 
 function svcSystemd(s) {
   const systemd = (s.services || {}).systemd || [];
-  if (!systemd.length) return `<div class="empty">Nessuna unit configurata.</div>`;
+  if (!systemd.length) return `<div class="empty">${h(t("servizi.nessunaUnit"))}</div>`;
   return `<table><tbody>${systemd.map(u => `<tr>
     <td><span class="status-dot ${u.ok ? "s-on" : (u.critical ? "s-down" : "s-off")}"></span>${h(u.label)}
       ${u.host ? `<span class="tag purple">${h(u.host)}</span>` : ""}
@@ -1807,13 +1827,13 @@ function svcSystemd(s) {
       ${u.dashboard ? `<span class="tag">dashboard</span>` : ""}
       ${u.ok ? "" : giuDa("systemd", u.host, u.name)}</td>
     <td class="right">${chipStato(u)}</td>
-    <td class="right nowrap"><button class="iconbtn" title="Modifica" data-svc-edit="${h(u.name)}" data-kind="systemd">✎</button><button class="iconbtn" title="Smetti di monitorare" data-svc-del="${h(u.name)}" data-kind="systemd">✕</button></td>
+    <td class="right nowrap"><button class="iconbtn" title="${h(t("comune.modifica"))}" data-svc-edit="${h(u.name)}" data-kind="systemd">✎</button><button class="iconbtn" title="${h(t("servizi.smettiMonitorare"))}" data-svc-del="${h(u.name)}" data-kind="systemd">✕</button></td>
   </tr>`).join("")}</tbody></table>`;
 }
 
 function svcWindows(s) {
   const win = (s.services || {}).windows_services || [];
-  if (!win.length) return `<div class="empty">Nessun servizio Windows configurato.</div>`;
+  if (!win.length) return `<div class="empty">${h(t("servizi.nessunWindows"))}</div>`;
   return `<table><tbody>${win.map(w => `<tr>
     <td><span class="status-dot ${w.ok ? "s-on" : (w.available ? (w.critical ? "s-down" : "s-off") : "s-off")}"></span>${h(w.label)}
       <span class="tag purple">${h(w.host)}</span>
@@ -1823,13 +1843,13 @@ function svcWindows(s) {
       <div class="muted mono" style="font-size:11px">${h(w.name)}${
         w.start_type ? ` · avvio ${h(w.start_type)}` : ""}</div></td>
     <td class="right">${chipStato(w)}</td>
-    <td class="right nowrap"><button class="iconbtn" title="Modifica" data-svc-edit="${h(w.name)}" data-kind="windows_service">✎</button><button class="iconbtn" title="Smetti di monitorare" data-svc-del="${h(w.name)}" data-kind="windows_service">✕</button></td>
+    <td class="right nowrap"><button class="iconbtn" title="${h(t("comune.modifica"))}" data-svc-edit="${h(w.name)}" data-kind="windows_service">✎</button><button class="iconbtn" title="${h(t("servizi.smettiMonitorare"))}" data-svc-del="${h(w.name)}" data-kind="windows_service">✕</button></td>
   </tr>`).join("")}</tbody></table>`;
 }
 
 function svcHealth(s) {
   const health = (s.services || {}).healthchecks || [];
-  if (!health.length) return `<div class="empty">Nessun healthcheck configurato.</div>`;
+  if (!health.length) return `<div class="empty">${h(t("servizi.nessunHealthcheck"))}</div>`;
   return `<table><tbody>${health.map(c => `<tr>
     <td><span class="status-dot ${c.ok ? "s-on" : "s-down"}"></span>${h(c.name)}
       <span class="tag">${h(c.type)}</span>
@@ -1837,7 +1857,7 @@ function svcHealth(s) {
       ${c.ok ? "" : giuDa("healthcheck", "", c.name)}
       <div class="muted mono" style="font-size:11px">${h(c.target)}</div></td>
     <td class="right">${chipStato(c)}</td>
-    <td class="right nowrap"><button class="iconbtn" title="Modifica" data-svc-edit="${h(c.name)}" data-kind="http">✎</button><button class="iconbtn" title="Smetti di monitorare" data-svc-del="${h(c.name)}" data-kind="http">✕</button></td>
+    <td class="right nowrap"><button class="iconbtn" title="${h(t("comune.modifica"))}" data-svc-edit="${h(c.name)}" data-kind="http">✎</button><button class="iconbtn" title="${h(t("servizi.smettiMonitorare"))}" data-svc-del="${h(c.name)}" data-kind="http">✕</button></td>
   </tr>`).join("")}</tbody></table>`;
 }
 
@@ -1876,18 +1896,18 @@ function pageServices(view, s) {
     ${notaSorgente("services")}
     <div class="controls">
       <button class="btn" id="svc-add" style="border-color:var(--teal);color:var(--teal)">+ Monitora servizio</button>
-      <span class="muted">scegli il metodo: systemd · servizio Windows · HTTP · TCP · ping · pin di un container</span>
+      <span class="muted">${h(t("servizi.scegliMetodo"))}</span>
     </div>
     <div class="grid cols-4" style="margin-bottom:14px" id="svc-kpi">${svcKpi(s)}</div>
     <div class="grid cols-2-1">
-      ${card("Container Docker", `<div id="svc-docker">${svcDocker(s)}</div>`,
+      ${card(t("servizi.containerDocker"), `<div id="svc-docker">${svcDocker(s)}</div>`,
         `<span class="muted">${badgeSorgente("docker")} ${etaSorgente("docker")}</span>`)}
       <div>
-        ${card("Servizi systemd (host)", `<div id="svc-systemd">${svcSystemd(s)}</div>`)}
+        ${card(t("servizi.systemdHost"), `<div id="svc-systemd">${svcSystemd(s)}</div>`)}
         <div style="height:14px"></div>
-        ${card("Servizi Windows", `<div id="svc-windows">${svcWindows(s)}</div>`)}
+        ${card(t("servizi.serviziWindows"), `<div id="svc-windows">${svcWindows(s)}</div>`)}
         <div style="height:14px"></div>
-        ${card("Healthcheck (HTTP / TCP / ping)", `<div id="svc-health">${svcHealth(s)}</div>`)}
+        ${card(t("servizi.healthcheck"), `<div id="svc-health">${svcHealth(s)}</div>`)}
       </div>
     </div>`;
   bindMonitorTabs(view);
@@ -1915,7 +1935,7 @@ async function serviceEdit(kind, ident) {
   const rc = await api("/api/services/config");
   // Prima si usciva in silenzio: il clic su "modifica" non apriva nulla e
   // sembrava un pulsante rotto.
-  if (!rc.ok) return void toastErrore(rc.error, { label: "Riprova", onclick: () => serviceEdit(kind, ident) });
+  if (!rc.ok) return void toastErrore(rc.error, { label: t("azione.riprova"), onclick: () => serviceEdit(kind, ident) });
   const cfg = rc.data;
   let ex = null;
   if (kind === "systemd") {
@@ -1950,7 +1970,7 @@ async function serviceEdit(kind, ident) {
    gli stati siano freschi quando hanno fino a un minuto. */
 async function chiediRicalcoloServizi() {
   const r = await api("/api/services/refresh", { method: "POST", retry: false });
-  if (!r.ok) toast("Stati aggiornati al prossimo giro (fra meno di un minuto).",
+  if (!r.ok) toast(t("msg.statiAlProssimoGiro"),
                    { level: "info" });
 }
 
@@ -2009,20 +2029,20 @@ function openServiceModal(ex) {
   const ov = document.createElement("div");
   ov.className = "modal-ov";
   ov.innerHTML = `<div class="modal">
-    <h3>${ex.nuovo ? "Aggiungi al catalogo" : editing ? "Modifica servizio" : "Monitora un servizio"}</h3>
-    <label>Metodo<select id="sv-method" ${editing ? "disabled" : ""}>
+    <h3>${h(ex.nuovo ? t("servizi.aggiungiCatalogo") : editing ? t("servizi.modificaServizio") : t("servizi.monitoraServizio"))}</h3>
+    <label>${h(t("servizi.metodo"))}<select id="sv-method" ${editing ? "disabled" : ""}>
       <option value="systemd">systemd (unit dell'host)</option>
-      <option value="windows_service">Servizio Windows (host via SSH)</option>
+      <option value="windows_service">${h(t("servizi.windowsSsh"))}</option>
       <option value="http">HTTP (URL)</option>
       <option value="tcp">TCP (host:porta)</option>
       <option value="ping">ping (host raggiungibile)</option>
-      <option value="docker">Docker (pin di un container)</option>
+      <option value="docker">${h(t("servizi.dockerPin"))}</option>
     </select></label>
     <div id="sv-fields"></div>
     <div id="sv-msg" class="cfg-note err" style="display:none"></div>
     <div class="modal-actions">
-      <button class="btn" id="sv-cancel">Annulla</button>
-      <button class="btn" id="sv-save" style="border-color:var(--teal);color:var(--teal)">${editing && !ex.nuovo ? "Salva" : "Aggiungi"}</button>
+      <button class="btn" id="sv-cancel">${h(t("comune.annulla"))}</button>
+      <button class="btn" id="sv-save" style="border-color:var(--teal);color:var(--teal)">${h(editing && !ex.nuovo ? t("comune.salva") : t("comune.aggiungi"))}</button>
     </div></div>`;
   document.body.appendChild(ov);
   const close = () => ov.remove();
@@ -2033,8 +2053,8 @@ function openServiceModal(ex) {
      macchina che ospita LANMng", per un servizio Windows quella macchina e'
      Linux e il servizio non ci puo' essere. */
   const hostField = (val, obbligatorio) => `
-    <label>Host (SSH) <span class="muted">${obbligatorio
-      ? "obbligatorio: il PC Windows su cui gira il servizio"
+    <label>${h(t("servizi.hostSsh"))} <span class="muted">${obbligatorio
+      ? t("servizi.hostObbligatorio")
       : "opzionale, default host locale"}</span>
       <input type="text" id="sv-host2" list="sv-hostlist" value="${h(val || "")}" placeholder="IP/hostname">
       <datalist id="sv-hostlist">${hosts.map(x => `<option value="${h(x)}">`).join("")}</datalist></label>`;
@@ -2047,34 +2067,34 @@ function openServiceModal(ex) {
         id="sv-dash" ${ex.dashboard !== false ? "checked" : ""}> mostra in dashboard</label>`;
   const fieldsFor = (m) => {
     if (m === "systemd") return `
-      <label>Unit<input type="text" id="sv-unit" value="${h(ex.unit || "")}" placeholder="es. nginx.service"></label>
-      <label>Etichetta<input type="text" id="sv-label" value="${h(ex.label || "")}" placeholder="nome leggibile"></label>
+      <label>${h(t("servizi.unit"))}<input type="text" id="sv-unit" value="${h(ex.unit || "")}" placeholder="es. nginx.service"></label>
+      <label>${h(t("comune.etichetta"))}<input type="text" id="sv-label" value="${h(ex.label || "")}" placeholder="nome leggibile"></label>
       ${hostField(ex.host)}
       <label class="muted" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="sv-critical" ${ex.critical ? "checked" : ""}> critico (alert se giù)</label>
       ${dashField}`;
     if (m === "windows_service") return `
-      <label>Servizio<input type="text" id="sv-name" value="${h(ex.name || "")}" placeholder="nome breve, es. Spooler"></label>
-      <label>Etichetta<input type="text" id="sv-label" value="${h(ex.label || "")}" placeholder="nome leggibile"></label>
+      <label>${h(t("servizi.servizio"))}<input type="text" id="sv-name" value="${h(ex.name || "")}" placeholder="nome breve, es. Spooler"></label>
+      <label>${h(t("comune.etichetta"))}<input type="text" id="sv-label" value="${h(ex.label || "")}" placeholder="nome leggibile"></label>
       ${hostField(ex.host, true)}
       <label class="muted" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="sv-critical" ${ex.critical ? "checked" : ""}> critico (alert se giù)</label>
       ${dashField}`;
     if (m === "http") return `
-      <label>Nome<input type="text" id="sv-name" value="${h(ex.name || "")}"></label>
+      <label>${h(t("comune.nome"))}<input type="text" id="sv-name" value="${h(ex.name || "")}"></label>
       <label>URL<input type="text" id="sv-url" value="${h(ex.url || "")}" placeholder="http://host:porta/path"></label>
-      <label>Status attesi<input type="text" id="sv-expect" value="${h((ex.expect_status || []).join(","))}" placeholder="200,204 (vuoto = 200)"></label>
+      <label>${h(t("servizi.statusAttesi"))}<input type="text" id="sv-expect" value="${h((ex.expect_status || []).join(","))}" placeholder="200,204 (vuoto = 200)"></label>
       ${dashField}`;
     if (m === "tcp") return `
-      <label>Nome<input type="text" id="sv-name" value="${h(ex.name || "")}"></label>
-      <label>Host<input type="text" id="sv-host" value="${h(ex.host || "")}" placeholder="IP o hostname (anche di rete)"></label>
-      <label>Porta<input type="text" id="sv-port" value="${h(ex.port || "")}" placeholder="es. 5432"></label>
+      <label>${h(t("comune.nome"))}<input type="text" id="sv-name" value="${h(ex.name || "")}"></label>
+      <label>${h(t("comune.host"))}<input type="text" id="sv-host" value="${h(ex.host || "")}" placeholder="IP o hostname (anche di rete)"></label>
+      <label>${h(t("comune.porta"))}<input type="text" id="sv-port" value="${h(ex.port || "")}" placeholder="es. 5432"></label>
       ${dashField}`;
     if (m === "ping") return `
-      <label>Nome<input type="text" id="sv-name" value="${h(ex.name || "")}"></label>
-      <label>Host<input type="text" id="sv-host" value="${h(ex.host || "")}" placeholder="IP o hostname (anche di rete)"></label>
+      <label>${h(t("comune.nome"))}<input type="text" id="sv-name" value="${h(ex.name || "")}"></label>
+      <label>${h(t("comune.host"))}<input type="text" id="sv-host" value="${h(ex.host || "")}" placeholder="IP o hostname (anche di rete)"></label>
       ${dashField}`;
     return `
-      <label>Nome container<input type="text" id="sv-name" value="${h(ex.name || "")}" placeholder="esatto come in docker ps"></label>
-      <label>Etichetta<input type="text" id="sv-label" value="${h(ex.label || "")}"></label>
+      <label>${h(t("servizi.nomeContainer"))}<input type="text" id="sv-name" value="${h(ex.name || "")}" placeholder="esatto come in docker ps"></label>
+      <label>${h(t("comune.etichetta"))}<input type="text" id="sv-label" value="${h(ex.label || "")}"></label>
       <label>URL pannello<input type="text" id="sv-url" value="${h(ex.url || "")}" placeholder="http://..."></label>
       ${dashField}`;
   };
@@ -2167,7 +2187,7 @@ async function loadResourcesHistory(r) {
   if (!primoCaricamento || rotti.length < esiti.length) resHist.period = chiesto;
   else resHist.period = null;
   resHist.stato = !rotti.length ? ""
-    : rotti.some(e => e.errore.kind === "sessione") ? "sessione scaduta: ricarica la pagina"
+    : rotti.some(e => e.errore.kind === "sessione") ? t("servizi.sessioneScaduta")
     : `${rotti[0].errore.messaggio} (${rotti.length} host su ${esiti.length})`;
   aggiornaNotaRisorse();
   drawResourceCharts(state.snap.resources || {});
@@ -2260,7 +2280,7 @@ function resourcesNote(r) {
       (<code>host_metrics.enabled: false</code> nelle Impostazioni).</div>`;
   if (r.warning)
     return `<div class="cfg-note err">${h(r.warning)}</div>`;
-  if (!r.ts) return `<div class="cfg-note">Prima raccolta in corso…</div>`;
+  if (!r.ts) return `<div class="cfg-note">${h(t("risorse.primaRaccolta"))}</div>`;
   // "almeno": la raccolta si aggancia al ciclo lento, che con scan e Docker in
   // corso puo' arrivare piu' tardi. Ogni scheda dichiara la finestra davvero
   // usata, quindi qui non si promette una cadenza che non e' garantita.
@@ -2283,7 +2303,7 @@ function hostsOrdinati(r) {
 
 function resourceCards(r) {
   const hosts = hostsOrdinati(r);
-  if (!hosts.length) return `<div class="empty">Nessun host da interrogare.</div>`;
+  if (!hosts.length) return `<div class="empty">${h(t("risorse.nessunHost"))}</div>`;
   return `<div class="grid cols-2">${hosts.map(hostCard).join("")}</div>`;
 }
 
@@ -2312,12 +2332,12 @@ function hostCard(x, idx) {
   const sistema = x.os === "windows" ? `<span class="tag">Windows</span> ` : "";
   const right = x.reachable
     ? `${sistema}<span class="muted mono">${h(x.host)} · up ${h(x.uptime_human || "—")}</span>`
-    : `${sistema}<span class="tag err" style="border-color:var(--bd-red)">non raggiungibile</span>`;
+    : `${sistema}<span class="tag err" style="border-color:var(--bd-red)">${h(t("comune.nonRaggiungibile"))}</span>`;
 
   if (!x.reachable) {
     const last = lastKnown(x.series);
     return card(x.name, `
-      <div class="cfg-note err">${h(x.error || "host non raggiungibile")}</div>
+      <div class="cfg-note err">${h(x.error || t("risorse.hostNonRaggiungibile"))}</div>
       ${last ? `<div class="muted" style="margin-top:10px;font-size:12px">Ultimo stato noto
           (${h(ago(Math.round(last.t / 1000)))}): CPU ${h(fmtPct(last.cpu))} ·
           RAM ${h(fmtPct(last.mem))}${last.temp != null ? " · " + h(last.temp) + " °C" : ""}.</div>`
@@ -2331,16 +2351,16 @@ function hostCard(x, idx) {
       <div>
         ${meter(cpu.percent, "CPU", cpu.window_seconds ? `media ${cpu.window_seconds}s` : "prima lettura")}
         ${meter(mem.used_pct, "RAM", `${fmtBytes(mem.used)} / ${fmtBytes(mem.total)}`)}
-        ${meter(swap.used_pct, "Swap", swap.total ? `${fmtBytes(swap.used)} / ${fmtBytes(swap.total)}` : "assente")}
+        ${meter(swap.used_pct, t("risorse.swap"), swap.total ? `${fmtBytes(swap.used)} / ${fmtBytes(swap.total)}` : "assente")}
       </div>
       <div>
-        <div class="kv"><span class="muted">Load</span><span class="mono">${
+        <div class="kv"><span class="muted">${h(t("host.load"))}</span><span class="mono">${
           (x.load || []).map(v => v.toFixed(2)).join("  ") || "—"}</span></div>
         <div class="kv"><span class="muted">CPU</span><span class="mono" style="text-align:right">${
           h(cpu.model || "—")}<br>${h(cpu.cores || "?")} core</span></div>
-        <div class="kv"><span class="muted">Temperatura</span><span class="mono">${
+        <div class="kv"><span class="muted">${h(t("host.temperatura"))}</span><span class="mono">${
           tmax == null ? "—" : h(tmax) + " °C"}</span></div>
-        <div class="kv"><span class="muted">Uptime</span><span class="mono">${h(x.uptime_human || "—")}</span></div>
+        <div class="kv"><span class="muted">${h(t("host.uptime"))}</span><span class="mono">${h(x.uptime_human || "—")}</span></div>
       </div>
     </div>
     ${cores.length ? `<div class="cores">${cores.map((c, i) =>
@@ -2377,7 +2397,7 @@ function diskTable(x) {
   // L'I/O e' per dispositivo fisico, lo spazio per filesystem: sono due elenchi
   // diversi e accostarli per nome darebbe accoppiamenti sbagliati (LVM, RAID).
   const ioRows = (x.disk_io || []).filter(d => d.read_bps != null || d.write_bps != null);
-  return `<table><thead><tr><th>Disco</th><th>Uso</th><th>Libero</th></tr></thead><tbody>
+  return `<table><thead><tr><th>${h(t("risorse.disco"))}</th><th>Uso</th><th>${h(t("risorse.libero"))}</th></tr></thead><tbody>
     ${disks.map(d => `<tr>
       <td class="mono">${h(d.mount)}<div class="muted" style="font-size:11px">${h(d.device)}
         ${d.fstype ? "· " + h(d.fstype) : ""}</div></td>
@@ -2398,7 +2418,7 @@ function tempTable(temps) {
 function procTable(procs) {
   if (!procs.length) return "";
   return `<table style="margin-top:10px"><thead><tr>
-      <th>Processo</th><th>Utente</th><th class="right">CPU</th><th class="right">RAM</th></tr></thead>
+      <th>${h(t("risorse.processo"))}</th><th>${h(t("risorse.utente"))}</th><th class="right">CPU</th><th class="right">RAM</th></tr></thead>
     <tbody>${procs.map(p => `<tr>
       <td class="mono">${h(p.command)} <span class="muted">${h(p.pid)}</span></td>
       <td class="mono muted">${h(p.user)}</td>
@@ -2474,7 +2494,7 @@ function statoPeer(p) {
   // collega quando serve (e' il motivo per cui l'alert sui peer mai connessi
   // nasce spento, vedi services/alerts.py). Il colore direbbe il falso; il
   // testo dice il fatto.
-  if (!p.last_handshake) return { cls: "ignoto", testo: "mai collegato" };
+  if (!p.last_handshake) return { cls: "ignoto", testo: t("wg.maiCollegato") };
   return { cls: "ignoto", testo: `fermo da ${durata(p.last_handshake)}` };
 }
 
@@ -2496,13 +2516,13 @@ function wgCorpo(s) {
         // e il tunnel su, un pallino d'allarme accuserebbe un guasto che non
         // c'e' (i peer si collegano quando servono).
         dot: attesa || !totali ? "s-off" : attivi ? "s-on" : "s-warn",
-        ctx: attesa ? "in attesa del primo giro"
-           : !totali ? "nessun peer configurato"
-           : giu ? `${conta(giu, "peer fermo", "peer fermi")}` : "tutti collegati" })}
+        ctx: attesa ? t("wg.attesaPrimoGiro")
+           : !totali ? t("wg.nessunPeerConfigurato")
+           : giu ? `${conta(giu, "conta.peerFermo")}` : t("stato.tuttiCollegati") })}
       ${kpi(attesa ? "–" : ifaces.length, "interfacce", "", {
         ctx: ifaces.map(i => i.name).join(", ") || "nessuna" })}
       ${kpi(h(wg.relay || "—"), "relay", "", {
-        ctx: wg.relay ? "endpoint dichiarato in configurazione" : "non configurato" })}
+        ctx: wg.relay ? "endpoint dichiarato in configurazione" : t("wg.nonConfigurato") })}
     </div>
     <div class="muted" style="margin-bottom:12px;font-size:12px">
       WireGuard gira sul <b>router</b>${(state.snap.meta || {}).router_name
@@ -2515,7 +2535,7 @@ function wgCorpo(s) {
       questo momento. Se il tunnel dovrebbe essere sempre su, e' il caso di guardare il
       router.</div>` : ""}
     ${peers.some(peerSenzaNome) ? `<div class="cfg-note">Qualche peer si presenta con la
-      sua chiave pubblica: i nomi si danno in <b>Impostazioni</b>, voce
+      sua chiave pubblica: i nomi si danno in <b>${h(t("comune.impostazioni"))}</b>, voce
       <code>wireguard.peer_names</code> (chiave pubblica → nome).</div>` : ""}`;
 }
 
@@ -2523,10 +2543,10 @@ function wgCorpo(s) {
    frase sia con il router muto sia con il router che risponde e non ha
    WireGuard acceso. */
 function wgVuoto(sorgente) {
-  if (!sorgente) return `<div class="empty">In attesa del primo giro di raccolta…</div>`;
+  if (!sorgente) return `<div class="empty">${h(t("wg.attesaRaccolta"))}</div>`;
   if (!sorgente.ok) return `<div class="empty">Nessun dato: il router non risponde
     (il dettaglio e' nell'avviso qui sopra).</div>`;
-  return `<div class="empty">Il router risponde ma non ha interfacce WireGuard attive.</div>`;
+  return `<div class="empty">${h(t("wg.nessunaInterfaccia"))}</div>`;
 }
 
 function wgCard(i) {
@@ -2534,9 +2554,9 @@ function wgCard(i) {
   return card(`Interfaccia ${h(i.name)}`, `
     <div class="muted mono" style="margin-bottom:10px">listen :${h(i.listen_port)} ·
       ${i.active_peers}/${i.total_peers} attivi</div>
-    ${!peers.length ? `<div class="empty">Nessun peer su questa interfaccia.</div>` : `
-    <table><thead><tr><th>Peer</th><th>Endpoint</th><th>Allowed IPs</th>
-      <th>Ultimo handshake</th><th>RX / TX totali</th><th></th></tr></thead>
+    ${!peers.length ? `<div class="empty">${h(t("wg.nessunPeerInterfaccia"))}</div>` : `
+    <table><thead><tr><th>${h(t("wg.peer"))}</th><th>${h(t("wg.endpoint"))}</th><th>${h(t("wg.allowedIps"))}</th>
+      <th>${h(t("wg.ultimoHandshake"))}</th><th>RX / TX totali</th><th></th></tr></thead>
     <tbody>${peers.map(p => {
       const st = statoPeer(p);
       return `<tr>
@@ -2585,10 +2605,10 @@ function statsSeries(s) {
 function arcoSerie(ser) {
   if ((ser || []).length < 2) return "";
   const min = Math.round(((ser[ser.length - 1].t || 0) - (ser[0].t || 0)) / 60000);
-  if (min < 1) return "meno di un minuto";
-  if (min < 90) return conta(min, "minuto", "minuti");
+  if (min < 1) return t("tempo.menoDiUnMinuto");
+  if (min < 90) return conta(min, "tempo.minuto");
   const ore = Math.round(min / 60);
-  return ore < 48 ? conta(ore, "ora", "ore") : conta(Math.round(ore / 24), "giorno", "giorni");
+  return ore < 48 ? conta(ore, "tempo.ora") : conta(Math.round(ore / 24), "tempo.giorno");
 }
 
 async function loadStatsHistory() {
@@ -2610,7 +2630,7 @@ async function loadStatsHistory() {
   if (chiesto !== statsPeriod) return;          // l'utente ha gia' cambiato idea
   if (!r.ok) {
     statsHist.stato = r.error.kind === "sessione"
-      ? "sessione scaduta: ricarica la pagina"
+      ? t("servizi.sessioneScaduta")
       : r.error.messaggio;
     // Il rinfresco periodico puo' fallire: in quel caso si tengono i punti che
     // gia' si avevano invece di svuotare il grafico sotto gli occhi.
@@ -2619,7 +2639,7 @@ async function loadStatsHistory() {
     statsHist.period = chiesto;
     statsHist.points = r.data.points || [];
     statsHist.stato = statsHist.points.some(p => p.rx_bps != null)
-      ? "" : "nessun dato ancora in archivio per questo periodo";
+      ? "" : t("stats.nessunArchivio");
   }
   drawStatsCharts(state.snap);
 }
@@ -2637,7 +2657,7 @@ function statsRiassunto(ser) {
     ${kpi(tx.length ? h(fmtRate(Math.max(...tx))) : "—", "picco TX", "")}
     ${kpi(lat.length ? `${Math.round(media(lat))}<span class="unit"> ms</span>` : "—",
       "latenza media", "", { ctx: probe ? `verso ${probe}` : "" })}
-    ${kpi(scambiati ? h(fmtBytes(scambiati)) : "—", "scambiati nel periodo", "",
+    ${kpi(scambiati ? h(fmtBytes(scambiati)) : "—", t("stats.scambiatiNelPeriodo"), "",
       { ctx: "stimato dalle velocita'" })}`;
 }
 
@@ -2658,7 +2678,7 @@ function volumeStimato(ser, campo) {
 function statsInterfacce(s) {
   const ifs = s.interfaces || [];
   if (!ifs.length) return `<div class="empty">In attesa dati router…</div>`;
-  return `<table><thead><tr><th>Interfaccia</th><th>IP</th><th>Stato</th><th>RX totali</th><th>TX totali</th></tr></thead>
+  return `<table><thead><tr><th>${h(t("comune.interfaccia"))}</th><th>IP</th><th>${h(t("comune.stato"))}</th><th>RX totali</th><th>TX totali</th></tr></thead>
     <tbody>${ifs.map(i => `<tr>
       <td class="mono">${h(i.name)} <span class="muted">${h(i.ifname)}</span>
         ${(i.shared_with || []).length ? `<div class="muted" style="font-size:11px">
@@ -2668,7 +2688,7 @@ function statsInterfacce(s) {
       ${trafficCells(i)}
     </tr>`).join("")}</tbody></table>
     ${ifs.some(i => (i.shared_with || []).length) ? `<div class="muted"
-      style="font-size:12px;padding:8px 12px">I contatori sono del <b>dispositivo</b> di rete, non
+      style="font-size:12px;padding:8px 12px">${h(t("stats.contatoriDel"))} <b>dispositivo</b> di rete, non
       della singola rete logica: dove piu' reti condividono lo stesso dispositivo il traffico non
       e' separabile e viene attribuito una volta sola. Per lo stesso motivo la somma delle reti non
       corrisponde alla WAN: il traffico fra subnet passa dal bridge senza mai uscire.</div>` : ""}`;
@@ -2731,16 +2751,16 @@ function pageStats(view, s) {
     </div>
     <div class="grid cols-4" style="margin-bottom:14px" id="st-kpi">${statsRiassunto(statsSeries(s))}</div>
     <div class="grid cols-2-1" style="margin-bottom:14px">
-      ${card("Velocita' WAN RX/TX", `<canvas class="chart tall" id="st-traffic"></canvas>
+      ${card(t("stats.velocitaWan"), `<canvas class="chart tall" id="st-traffic"></canvas>
         <div class="rates"><span class="rate"><i style="background:var(--teal)"></i>↓ <span id="st-rx">—</span></span>
         <span class="rate"><i style="background:var(--green)"></i>↑ <span id="st-tx">—</span></span></div>`,
-        `<span class="muted">bit/s, media sull'intervallo di lettura</span>`)}
-      ${card("Latenza internet", `<canvas class="chart tall" id="st-lat"></canvas>
+        `<span class="muted">${h(t("stats.bitMedia"))}</span>`)}
+      ${card(t("stats.latenzaInternet"), `<canvas class="chart tall" id="st-lat"></canvas>
         <div class="muted" style="font-size:12px;margin-top:8px">Un buco nella linea
         significa che il bersaglio non ha risposto: non e' latenza zero.</div>`,
         `<span class="muted" id="st-latnow">—</span>`)}
     </div>
-    ${card("Interfacce router", `<div id="st-if">${statsInterfacce(s)}</div>`,
+    ${card(t("stats.interfacceRouter"), `<div id="st-if">${statsInterfacce(s)}</div>`,
       `<span id="st-if-testa"></span>`)}`;
   $("#st-period").querySelectorAll("button").forEach(b => b.onclick = () => {
     if (statsPeriod === b.dataset.v) return;
@@ -2771,22 +2791,20 @@ async function sessionGate(view, onReady) {
   // Con l'API giu' si diceva "Password admin mancante": si accusava il
   // proprietario di non aver fatto una cosa che invece aveva fatto.
   if (stato === "offline") {
-    view.innerHTML = card("Accesso non verificabile", noteErrore(esito.error, "gate-retry"));
+    view.innerHTML = card(t("sicurezza.accessoNonVerificabile"), noteErrore(esito.error, "gate-retry"));
     const b = $("#gate-retry");
     if (b) b.onclick = () => sessionGate(view, onReady);
     return;
   }
   if (stato === "senza-password") {
-    view.innerHTML = card("Password admin mancante",
-      `<div class="empty">Imposta prima una password admin in
-         <a class="link" href="#/settings">Impostazioni</a>: senza, tools e terminale
-         restano chiusi.</div>`);
+    view.innerHTML = card(t("sicurezza.passwordMancante"),
+      `<div class="empty">${h(t("sicurezza.impostaPrima"))}
+         <a class="link" href="#/settings">${h(t("comune.impostazioni"))}</a>${h(t("sicurezza.senzaToolsChiusi"))}</div>`);
     return;
   }
-  view.innerHTML = card("Accesso richiesto",
+  view.innerHTML = card(t("sicurezza.accessoRichiesto"),
     `<div id="gate-form"></div>
-     <div class="muted" style="margin-top:10px">Questa pagina esegue comandi sulla rete:
-       serve una sessione anche se il login generale e' disattivato.</div>`);
+     <div class="muted" style="margin-top:10px">${h(t("sicurezza.pagineEsegueComandi"))}</div>`);
   // Stesso form del pannello della sessione scaduta: un solo punto che fa
   // login in tutta la SPA, in due contenitori diversi.
   if (await formLogin($("#gate-form"))) renderRoute();
@@ -2808,7 +2826,7 @@ function pageTools(view) {
     const r = await api("/api/tools/");
     if (r.ok) toolsState.catalog = r.data.tools;
     else if (!toolsState.catalog) {
-      view.innerHTML = card("Tools", noteErrore(r.error, "tl-retry"));
+      view.innerHTML = card(t("nav.tools"), noteErrore(r.error, "tl-retry"));
       const b = $("#tl-retry");
       if (b) b.onclick = () => pageTools(view);
       return;
@@ -2821,7 +2839,7 @@ function renderTools(view) {
   const cat = toolsState.catalog;
   const cur = cat.find(t => t.id === toolsState.tool) || cat[0];
   view.innerHTML = `
-    ${card("Strumenti di rete", `
+    ${card(t("tools.titolo"), `
       <div class="controls" style="margin-bottom:0">
         <select id="tl-tool">${cat.map(t =>
           `<option value="${h(t.id)}"${t.id === cur.id ? " selected" : ""}>${h(t.label)}</option>`).join("")}</select>
@@ -2830,14 +2848,14 @@ function renderTools(view) {
           style="min-width:220px">`}
         ${optionInputs(cur)}
         <button class="btn" id="tl-run"${toolsState.running ? " disabled" : ""}
-          style="border-color:var(--teal);color:var(--teal)">${toolsState.running ? "in corso…" : "Esegui"}</button>
+          style="border-color:var(--teal);color:var(--teal)">${h(toolsState.running ? t("tools.inCorso") : t("comune.esegui"))}</button>
         <span class="muted">${h(cur.help)}</span>
       </div>`)}
-    ${card("Output", `<div class="logbox" id="tl-out">
+    ${card(t("comune.output"), `<div class="logbox" id="tl-out">
       ${toolsState.running
         ? `<div class="l muted">esecuzione in corso… <span id="tl-crono"></span></div>` : ""}
       <div class="l${toolsState.out ? "" : " muted"}" id="tl-testo">${h(toolsState.out
-        || (toolsState.running ? "" : "Scegli uno strumento e un bersaglio."))}</div>
+        || (toolsState.running ? "" : t("tools.scegliStrumento")))}</div>
       </div>`)}`;
 
   $("#tl-tool").onchange = (e) => { toolsState.tool = e.target.value; toolsState.options = {}; renderTools(view); };
@@ -2845,9 +2863,9 @@ function renderTools(view) {
   // La misura di velocita' non ha un bersaglio: l'indirizzo sta in
   // configurazione, e un campo vuoto da riempire sarebbe una domanda senza
   // risposta giusta.
-  const t = $("#tl-target");
-  if (t) {
-    t.oninput = (e) => { toolsState.target = e.target.value; };
+  const campo = $("#tl-target");
+  if (campo) {
+    campo.oninput = (e) => { toolsState.target = e.target.value; };
     t.onkeydown = (e) => { if (e.key === "Enter") runTool(view, cur); };
   }
 }
@@ -2907,12 +2925,12 @@ function fermaCronometro() {
    qualcosa solo a chi conosce il tool: un arping senza risposte usciva "1" e
    sembrava un errore del programma invece che un IP spento. */
 function esitoTool(d) {
-  if (d.timed_out) return "interrotto: superato il tempo massimo";
+  if (d.timed_out) return t("tools.interrottoTempo");
   if (d.exit_code === 0) return "riuscito";
   // Senza codice d'uscita il comando non e' arrivato in fondo: "uscita ?" non
   // lo diceva, e sembrava un errore del programma.
   if (d.exit_code === null || d.exit_code === undefined)
-    return d.truncated ? "interrotto: output troppo lungo" : "interrotto prima della fine";
+    return d.truncated ? "interrotto: output troppo lungo" : t("tools.interrottoPrima");
   return `nessun risultato (uscita ${d.exit_code})`;
 }
 
@@ -3073,7 +3091,7 @@ async function runTool(view, tool) {
 let hostState = { dati: null, virtuali: false, quando: 0, caricando: false };
 
 function pageHost(view) {
-  if (!hostState.dati) view.innerHTML = card("Host", `<div class="empty">Lettura in corso…</div>`);
+  if (!hostState.dati) view.innerHTML = card(t("nav.host"), `<div class="empty">${h(t("host.letturaInCorso"))}</div>`);
   return caricaHost(view);
 }
 
@@ -3085,7 +3103,7 @@ async function caricaHost(view) {
   const r = await api("/api/host/network");
   hostState.caricando = false;
   if (!r.ok) {
-    view.innerHTML = card("Host", noteErrore(r.error, "hs-retry"));
+    view.innerHTML = card(t("nav.host"), noteErrore(r.error, "hs-retry"));
     const rb = $("#hs-retry");
     if (rb) rb.onclick = () => pageHost(view);
     return;
@@ -3108,23 +3126,23 @@ function renderHost(view, d) {
   view.innerHTML = `
     ${alertBox("host")}
     <div class="muted" style="margin-bottom:12px;font-size:12px">
-      Le interfacce di <b>${h(d.hostname || "questo host")}</b>, la macchina che ospita LANMng —
+      Le interfacce di <b>${h(d.hostname || t("host.questoHost"))}</b>, la macchina che ospita LANMng —
       non quelle del router, che stanno in WAN. Lettura fatta con
       ${h(d.source === "ip" ? "iproute2" : "nmap (ripiego)")} ${h(quandoLetto())}.
     </div>
-    ${card("Interfacce", `${mostrate.length ? `<table><thead><tr>
-      <th>Interfaccia</th><th>Stato</th><th>Indirizzi</th><th>MAC</th><th>Velocita'</th>
-      <th>MTU</th><th>RX / TX</th><th>Errori</th><th>Subnet</th></tr></thead>
+    ${card(t("host.interfacce"), `${mostrate.length ? `<table><thead><tr>
+      <th>${h(t("comune.interfaccia"))}</th><th>${h(t("comune.stato"))}</th><th>${h(t("host.indirizzi"))}</th><th>MAC</th><th>${h(t("comune.velocita"))}</th>
+      <th>MTU</th><th>RX / TX</th><th>${h(t("comune.errori"))}</th><th>${h(t("comune.subnet"))}</th></tr></thead>
       <tbody>${mostrate.map(hostIfRow).join("")}</tbody></table>`
-      : `<div class="empty">Nessuna interfaccia da mostrare.</div>`}
+      : `<div class="empty">${h(t("host.nessunaInterfaccia"))}</div>`}
       ${nascoste ? `<label class="muted" style="display:flex;align-items:center;gap:6px;
         margin-top:10px;cursor:pointer"><input type="checkbox" id="hs-virt"${
         hostState.virtuali ? " checked" : ""}> mostra anche le
-        ${conta(nascoste, "interfaccia virtuale", "interfacce virtuali")} (bridge e veth dei
+        ${conta(nascoste, "conta.ifaceVirtuale")} (bridge e veth dei
         container)</label>` : ""}`,
       `<button class="btn" id="hs-refresh">&#8635; Aggiorna</button>`)}
-    ${rotte.length ? card("Rotte", `<table><thead><tr>
-      <th>Destinazione</th><th>Gateway</th><th>Interfaccia</th><th>Metrica</th><th></th></tr></thead>
+    ${rotte.length ? card(t("host.rotte"), `<table><thead><tr>
+      <th>${h(t("host.destinazione"))}</th><th>${h(t("host.gateway"))}</th><th>${h(t("comune.interfaccia"))}</th><th>${h(t("host.metrica"))}</th><th></th></tr></thead>
       <tbody>${rotte.map(r => {
         const attiva = r.default && (r.metric == null ? 0 : r.metric) === metricaAttiva;
         return `<tr${r.default ? ' style="font-weight:600"' : ""}>
@@ -3132,7 +3150,7 @@ function renderHost(view, d) {
         <td class="mono">${h(r.dev)}</td><td class="mono muted">${h(r.metric ?? "—")}</td>
         <td>${!r.default ? "" : attiva
           ? `<span class="chip ok">in uso</span>`
-          : `<span class="chip ignoto" title="metrica piu' alta: si usa solo se cade l'altra">di riserva</span>`}</td>
+          : `<span class="chip ignoto" title="${h(t("host.metricaPiuAlta"))}">${h(t("host.diRiserva"))}</span>`}</td>
       </tr>`; }).join("")}</tbody></table>`) : ""}`;
 
   $("#hs-refresh").onclick = () => caricaHost(view);
@@ -3142,9 +3160,9 @@ function renderHost(view, d) {
 
 function quandoLetto() {
   if (!hostState.quando) return "";
-  const t = new Date(hostState.quando);
+  const q = new Date(hostState.quando);
   const due = (n) => String(n).padStart(2, "0");
-  return `alle ${due(t.getHours())}:${due(t.getMinutes())}:${due(t.getSeconds())}`;
+  return `${t("host.alle")} ${due(q.getHours())}:${due(q.getMinutes())}:${due(q.getSeconds())}`;
 }
 
 /* Errori e scarti sono contatori dall'avvio della macchina: nove errori su
@@ -3158,7 +3176,7 @@ function erroriIf(st) {
   const grave = totale > 0 && tasso > 0.0001;      // piu' di uno su diecimila
   const scartati = (st.rx_dropped || 0) + (st.tx_dropped || 0);
   const titolo = pacchetti
-    ? `${totale} errori su ${pacchetti.toLocaleString("it-IT")} pacchetti`
+    ? `${totale} errori su ${pacchetti.toLocaleString(I18N.locale())} pacchetti`
       + (scartati ? ` · ${scartati} scartati` : "")
       + " (contatori dall'avvio)"
     : "contatori dall'avvio";
@@ -3196,14 +3214,14 @@ function pageTerminal(view) {
   sessionGate(view, async () => {
     const r = await api("/api/terminal/hosts");
     if (!r.ok) {
-      view.innerHTML = card("Terminale", noteErrore(r.error, "tm-retry"));
+      view.innerHTML = card(t("term.titolo"), noteErrore(r.error, "tm-retry"));
       const b = $("#tm-retry");
       if (b) b.onclick = () => pageTerminal(view);
       return;
     }
     const info = r.data;
     if (!info.enabled) {
-      view.innerHTML = card("Terminale", `<div class="empty">Disattivato in configurazione
+      view.innerHTML = card(t("term.titolo"), `<div class="empty">${h(t("term.disattivato"))}
         (<span class="mono">terminal.enabled</span>).</div>`);
       return;
     }
@@ -3216,8 +3234,8 @@ function pageTerminal(view) {
    sembra decisa da qualcun altro. Solo gli "ssh" si gestiscono da qui. */
 const TERM_SOURCE = {
   router: { label: "router", hint: "dalla sezione router della configurazione" },
-  systemd: { label: "host di LANMng", hint: "dalla sezione systemd della configurazione" },
-  ssh: { label: "aggiunto da te", hint: "elenco host SSH, gestibile qui sotto" },
+  systemd: { label: t("term.hostDiLanmng"), hint: "dalla sezione systemd della configurazione" },
+  ssh: { label: t("term.aggiuntoDaTe"), hint: "elenco host SSH, gestibile qui sotto" },
 };
 
 /* Il terminale legge i tasti da un <div> focalizzabile (vedi terminal.js):
@@ -3229,7 +3247,7 @@ function terminalTouchNotice() {
   // da sola solleva "Illegal invocation" e farebbe saltare tutta la pagina.
   if (!window.matchMedia || !window.matchMedia("(pointer: coarse)").matches) return "";
   return `<div class="cfg-note err" style="margin:0 0 12px">
-    <b>Da telefono o tablet non si puo' digitare.</b> Il terminale riceve i tasti
+    <b>${h(t("term.daTelefono"))}</b> Il terminale riceve i tasti
     da una tastiera vera (anche Bluetooth): con la sola tastiera a schermo la
     connessione si apre e mostra l'output, ma resta muta. Per lavorare davvero
     su un host usa un computer, oppure un client SSH del telefono.</div>`;
@@ -3243,32 +3261,29 @@ function renderTerminal(view, info) {
       <select id="tm-host"${hosts.length ? "" : " disabled"}>${hosts.map(hh =>
         `<option value="${h(hh.host)}"${hh.host === term.host ? " selected" : ""}>
            ${h(hh.label)} — ${h(hh.user)}@${h(hh.host)}</option>`).join("")
-        || `<option>nessun host configurato</option>`}</select>
+        || `<option>${h(t("term.nessunHost"))}</option>`}</select>
       <button class="btn" id="tm-conn"${hosts.length ? "" : " disabled"}
-        style="border-color:var(--teal);color:var(--teal)">Connetti</button>
-      <button class="btn" id="tm-close"${term.ws ? "" : " disabled"}>Chiudi</button>
+        style="border-color:var(--teal);color:var(--teal)">${h(t("comune.connetti"))}</button>
+      <button class="btn" id="tm-close"${term.ws ? "" : " disabled"}>${h(t("comune.chiudi"))}</button>
       <span class="pill" id="tm-state"><span class="dot"></span> ${h(term.status)}</span>
       <span class="muted" style="margin-left:auto">chiusura automatica dopo
         ${Math.round((info.idle_timeout || 900) / 60)} min di inattivita'</span>
     </div>
     <div class="card" style="padding:0"><div id="tm-box"></div></div>
     <div class="muted" style="font-size:12px;margin-top:8px">
-      <b>Copia</b>: seleziona col mouse e premi Ctrl+C (senza selezione Ctrl+C interrompe il
-      comando, come in una shell) oppure Ctrl+Shift+C. <b>Incolla</b>: Ctrl+V, Ctrl+Shift+V o
-      tasto destro. I comandi digitati finiscono nel registro di audit. Shell interattive e TUI
-      semplici (top, htop) funzionano; editor complessi come vim possono rendere in modo imperfetto.
+      ${t("term.aiuto")}
     </div>
-    ${card("Host raggiungibili", `
-      <table><thead><tr><th>Host</th><th>Utente</th><th>Origine</th><th></th></tr></thead>
+    ${card(t("term.hostRaggiungibili"), `
+      <table><thead><tr><th>${h(t("comune.host"))}</th><th>${h(t("comune.utente"))}</th><th>${h(t("comune.origine"))}</th><th></th></tr></thead>
         <tbody>${hosts.map(hh => `<tr>
           <td class="mono">${h(hh.host)}</td>
           <td class="mono muted">${h(hh.user)}</td>
           <td><span class="tag">${h((TERM_SOURCE[hh.source] || {}).label || hh.source)}</span>
               <span class="muted" style="font-size:11px">${h((TERM_SOURCE[hh.source] || {}).hint || "")}</span></td>
           <td class="right">${hh.editable
-            ? `<button class="iconbtn" title="Rimuovi dall'elenco" data-rm="${h(hh.host)}">✕</button>`
-            : `<span class="muted" style="font-size:11px">da Impostazioni</span>`}</td>
-        </tr>`).join("") || `<tr><td colspan="4" class="muted">Nessun host.</td></tr>`}</tbody></table>
+            ? `<button class="iconbtn" title="${h(t("term.rimuoviDallElenco"))}" data-rm="${h(hh.host)}">✕</button>`
+            : `<span class="muted" style="font-size:11px">${h(t("term.daImpostazioni"))}</span>`}</td>
+        </tr>`).join("") || `<tr><td colspan="4" class="muted">${h(t("term.nessunHostPunto"))}</td></tr>`}</tbody></table>
       <form class="controls" id="tm-add" style="margin:10px 0 0">
         <input type="text" id="tm-new-host" placeholder="IP o nome host…" style="min-width:170px">
         <input type="text" id="tm-new-user" placeholder="utente (vuoto = predefinito)" style="min-width:170px">
@@ -3301,7 +3316,7 @@ async function addTerminalHost(view, info) {
     user: $("#tm-new-user").value.trim(),
     key: $("#tm-new-key").value.trim(),
   };
-  if (!body.host) { msg.textContent = "indica un IP o un nome host"; return; }
+  if (!body.host) { msg.textContent = t("term.indicaIpOHost"); return; }
   msg.textContent = "salvataggio…";
   const r = await api("/api/terminal/hosts", { method: "POST", body });
   if (!r.ok) { msg.textContent = r.error.messaggio; return; }
@@ -3328,13 +3343,12 @@ async function spiegaChiusuraTerminale(emu) {
   setTermStatus("chiuso", "down");
   const st = await api("/api/auth/status", { auth: false, retry: false, timeout: 4000 });
   const perche = !st.ok
-    ? "il backend non risponde"
+    ? t("term.backendNonRisponde")
     : !st.data.session
-      ? "la sessione e' scaduta: rientra dal pannello di accesso e riprova"
-      : "il server ha rifiutato la connessione — controlla che il terminale sia attivo "
-        + "in configurazione e che questa pagina arrivi dallo stesso indirizzo del backend";
+      ? t("term.sessioneScaduta")
+      : t("term.rifiutata");
   if (emu) emu.write(`\r\n\x1b[31mConnessione non aperta: ${perche}\x1b[0m\r\n`);
-  setTermStatus(!st.ok ? "backend non raggiungibile"
+  setTermStatus(!st.ok ? t("term.backendNonRaggiungibile")
     : !st.data.session ? "sessione scaduta" : "connessione rifiutata", "down");
 }
 
@@ -3352,8 +3366,8 @@ function connectTerminal() {
   // nessuna spiegazione.
   if (typeof Terminal !== "function") {
     box.innerHTML = `<div class="cfg-note err" style="margin:12px">Il modulo del terminale
-      (<span class="mono">terminal.js</span>) non e' stato caricato: ricarica la pagina.</div>`;
-    setTermStatus("terminale non caricato", "down");
+      (<span class="mono">terminal.js</span>${h(t("term.ricaricaPagina"))}</div>`;
+    setTermStatus(t("term.nonCaricato"), "down");
     return;
   }
   const emu = new Terminal(box, { scrollback: 1500 });
@@ -3412,21 +3426,21 @@ function pageWan(view, s) {
     ${alertBox("wan")}
     ${notaSorgente("interfaces")}
     <div id="wan-corpo">${wanCorpo(s)}</div>
-    ${card("Prova la connessione", `
+    ${card(t("wan.provaConnessione"), `
       <div class="muted" style="font-size:12px;margin-bottom:10px">Il ping parte dal
         <b>router</b>, non da questo host: risponde alla domanda "esce la connessione di
         casa?" invece che "questo container vede internet?".</div>
       <div class="controls" style="margin-bottom:0">
         <input type="text" id="wan-ping-host" style="min-width:220px"
           placeholder="${h(sondaInternet())} (predefinito)">
-        <button class="btn" id="wan-ping">Ping dal router</button>
+        <button class="btn" id="wan-ping">${h(t("wan.pingDalRouter"))}</button>
         <span class="muted" id="wan-ping-esito"></span>
       </div>`)}
-    ${card("Firewall del router", `
+    ${card(t("wan.firewallRouter"), `
       <div class="muted" style="font-size:12px;margin-bottom:10px">Le regole in vigore adesso
         sul router (nftables). Si caricano su richiesta: sono migliaia di righe e leggerle ad
         ogni visita costerebbe una connessione SSH per niente.</div>
-      <button class="btn" id="wan-fw">Carica le regole</button>
+      <button class="btn" id="wan-fw">${h(t("wan.caricaRegole"))}</button>
       <div id="wan-fw-nota"></div>
       <pre class="logbox" id="wan-fw-box" hidden
            style="max-height:360px;white-space:pre;overflow:auto"></pre>`)}`;
@@ -3481,13 +3495,13 @@ function wanCorpo(s) {
     <div class="grid cols-3" style="margin-bottom:14px">
       ${kpi(h(nome || "—"), "uplink", "", {
         dot: !nome ? "s-off" : su ? "s-on" : "s-down",
-        ctx: !nome ? "non riconosciuto"
+        ctx: !nome ? t("wan.nonRiconosciuto")
            : wan.map(i => `${i.ifname || "?"} · ${(i.ip4 || []).join(", ") || "senza IP"}`).join(" · ")
-             || "nessun dettaglio" })}
+             || t("wan.nessunDettaglio") })}
       ${kpi(!ultimo ? "–" : internetOk ? `${Math.round(ultimo.latency)}<span class="unit">ms</span>`
-                                       : "non risponde", "internet", "", {
+                                       : t("servizi.nonRisponde"), "internet", "", {
         dot: !ultimo ? "s-off" : internetOk ? "s-on" : "s-down",
-        ctx: !ultimo ? "in attesa della prima misura"
+        ctx: !ultimo ? t("wan.attesaPrimaMisura")
            : internetOk ? `ping verso ${sondaInternet()}`
            : scorsa ? `verso ${sondaInternet()} · ultima risposta ${ago(Math.round(scorsa.t / 1000))}`
                     : `verso ${sondaInternet()} · mai una risposta` })}
@@ -3495,10 +3509,10 @@ function wanCorpo(s) {
             : `<span class="mono">↓ ${fmtRate(rate.rx_bps)}<br>↑ ${fmtRate(rate.tx_bps)}</span>`,
             "adesso", "", {
         ctx: wan.length ? `totali ${fmtMB(wan[0].rx_mb)} in · ${fmtMB(wan[0].tx_mb)} out`
-                        : "nessun contatore" })}
+                        : t("wan.nessunContatore") })}
     </div>
-    ${card("Connessione WAN", wan.length ? `
-      <table><thead><tr><th>Interfaccia</th><th>IP</th><th>Stato</th>
+    ${card(t("wan.connessioneWan"), wan.length ? `
+      <table><thead><tr><th>${h(t("comune.interfaccia"))}</th><th>IP</th><th>${h(t("comune.stato"))}</th>
         <th>RX totali</th><th>TX totali</th></tr></thead>
       <tbody>${wan.map(i => `<tr>
         <td class="mono">${h(i.name)} <span class="muted">${h(i.ifname)}</span></td>
@@ -3520,9 +3534,9 @@ function wanCorpo(s) {
 function wanVuoto(s, ifaces) {
   const sorgente = (state.snap.sources || {}).interfaces;
   if (!ifaces.length) {
-    if (!sorgente) return `<div class="empty">In attesa del primo giro di raccolta…</div>`;
-    return `<div class="empty">Nessuna interfaccia dal router${
-      sorgente.ok ? "" : ": non risponde (il dettaglio e' nell'avviso qui sopra)"}.</div>`;
+    if (!sorgente) return `<div class="empty">${h(t("wg.attesaRaccolta"))}</div>`;
+    return `<div class="empty">${h(t("wan.nessunaInterfacciaRouter"))}${
+      sorgente.ok ? "" : h(t("wan.nonRispondeDettaglio"))}.</div>`;
   }
   const candidati = (state.snap.meta || {}).wan_candidates || [];
   const su = ifaces.filter(i => i.up && (i.ip4 || []).length);
@@ -3592,15 +3606,15 @@ async function pageLogs(view) {
   view.innerHTML = `
     ${alertBox("logs")}
     <div class="controls">
-      <select id="lsource" title="da quale registro leggere"></select>
+      <select id="lsource" title="${h(t("logs.daQualeRegistro"))}"></select>
       <select id="llevel"><option value="">tutti i livelli</option>
         <option value="error">errori</option><option value="warn">warning</option>
         <option value="info">info</option><option value="debug">debug</option></select>
       <input type="text" id="lfilter" style="min-width:180px"
-        placeholder="cerca nel log (es. dnsmasq, dhcp)…">
+        placeholder="${h(t("logs.cercaNelLog"))}">
       <input type="text" id="lexclude" style="min-width:160px"
-        placeholder="nascondi, anche piu' d'uno separato da virgola…">
-      <select id="lperiod"><option value="">da sempre</option>
+        placeholder="${h(t("logs.nascondi"))}">
+      <select id="lperiod"><option value="">${h(t("logs.daSempre"))}</option>
         <option value="15m">ultimi 15 min</option><option value="1h">ultima ora</option>
         <option value="6h">ultime 6 ore</option><option value="24h">ultime 24 ore</option>
         <option value="7d">ultimi 7 giorni</option></select>
@@ -3647,7 +3661,7 @@ async function caricaSorgenti() {
   logSorgenti = (r.ok && r.data && r.data.sources) ? r.data.sources : [];
   // Se l'elenco non arriva resta almeno il syslog: e' la sorgente che c'e'
   // sempre, e una pagina senza selettore sarebbe peggio di una con una voce.
-  if (!logSorgenti.length) logSorgenti = [{ id: "router", label: "Router (syslog)" }];
+  if (!logSorgenti.length) logSorgenti = [{ id: "router", label: t("logs.routerSyslog") }];
   const scelta = logSorgenti.some(s => s.id === logStato.sorgente)
     ? logStato.sorgente : logSorgenti[0].id;
   sel.innerHTML = logSorgenti.map(s =>
@@ -3735,14 +3749,14 @@ function termineLog() {
    sua volta prima del confronto, altrimenti cercare "&" non troverebbe niente:
    nel testo e' gia' diventato "&amp;". */
 function evidenzia(testoEscapato, termine) {
-  const t = h(termine || "").trim();
-  if (!t) return testoEscapato;
+  const cercato = h(termine || "").trim();
+  if (!cercato) return testoEscapato;
   const pezzi = [];
   let resto = testoEscapato, i;
-  const basso = t.toLowerCase();
+  const basso = cercato.toLowerCase();
   while ((i = resto.toLowerCase().indexOf(basso)) !== -1) {
-    pezzi.push(resto.slice(0, i), `<mark>${resto.slice(i, i + t.length)}</mark>`);
-    resto = resto.slice(i + t.length);
+    pezzi.push(resto.slice(0, i), `<mark>${resto.slice(i, i + cercato.length)}</mark>`);
+    resto = resto.slice(i + cercato.length);
   }
   pezzi.push(resto);
   return pezzi.join("");
@@ -3786,7 +3800,7 @@ function notaWarning() {
 function notaFiltriLogs() {
   const n = logStato.filtri || 0;
   if (!n) return "";
-  return `<div class="cfg-note">${conta(n, "regola di scarto attiva", "regole di scarto attive")}
+  return `<div class="cfg-note">${conta(n, "conta.regolaScarto")}
     su questa sorgente: le righe che vi corrispondono non vengono mostrate ne'
     archiviate (<code>logs.exclude</code>, si cambia in Impostazioni).</div>`;
 }
@@ -3796,9 +3810,9 @@ function notaFiltriLogs() {
 function logVuoto() {
   const filtri = [$("#lfilter").value, $("#lexclude").value, $("#llevel").value,
                   $("#lperiod") && $("#lperiod").value].some(x => (x || "").trim());
-  const voce = (logSorgenti.find(s => s.id === logStato.sorgente) || {}).label || "Il log";
+  const voce = (logSorgenti.find(s => s.id === logStato.sorgente) || {}).label || t("logs.ilLog");
   return `<div class="empty">${filtri
-    ? "Nessuna riga con questi filtri: prova ad allargarli, ad allungare l'intervallo o ad aumentare le righe lette."
+    ? t("logs.nessunaRigaFiltri")
     : `${h(voce)}: nessuna riga.`}</div>`;
 }
 
@@ -3807,7 +3821,7 @@ function aggiornaStatoLogs() {
   if (!el) return;
   const ora = new Date(logStato.quando);
   const due = (n) => String(n).padStart(2, "0");
-  el.textContent = `${conta(logStato.righe, "riga", "righe")} · ${
+  el.textContent = `${conta(logStato.righe, "conta.riga")} · ${
     logTail ? "in diretta dalle" : "letto alle"} ${
     due(ora.getHours())}:${due(ora.getMinutes())}:${due(ora.getSeconds())}`;
 }
@@ -3923,9 +3937,9 @@ function appendiRigaLog(l) {
    da quello che si aveva davanti e' peggio che non allegarlo. */
 function esportaLogs() {
   const righe = logStato.ultime || [];
-  if (!righe.length) { toast("Non c'e' niente da esportare.", { level: "warn" }); return; }
+  if (!righe.length) { toast(t("msg.nienteDaEsportare"), { level: "warn" }); return; }
   const json = confirm("OK per il formato JSON (con livello, sorgente e orario),\n" +
-                       "Annulla per il testo semplice.");
+                       t("chiedi.formatoExport"));
   const nome = `lanmng-${String(logStato.sorgente).replace(/[^a-z0-9]+/gi, "-")}-${
     new Date().toISOString().slice(0, 19).replace(/[:T-]/g, "")}`;
   if (json)
@@ -3950,7 +3964,7 @@ function scaricaFile(nome, contenuto, mime) {
     setTimeout(() => URL.revokeObjectURL(url), 5000);
     return true;
   } catch (e) {
-    toast("Il browser non ha permesso il download.", { level: "warn" });
+    toast(t("msg.downloadNegato"), { level: "warn" });
     return false;
   }
 }
@@ -3961,8 +3975,8 @@ function scaricaFile(nome, contenuto, mime) {
 let cfgSalvato = null;
 
 function cfgSporco() {
-  const t = $("#cfg-yaml");
-  return !!t && cfgSalvato !== null && t.value !== cfgSalvato;
+  const ed = $("#cfg-yaml");
+  return !!ed && cfgSalvato !== null && ed.value !== cfgSalvato;
 }
 
 /* Mezza pagina chiede di riavviare il servizio e nessuno diceva come si fa:
@@ -3972,11 +3986,7 @@ function cfgSporco() {
 function notaRiavvio() {
   return `<div class="cfg-note" style="margin-top:10px">
     <div id="riavvio-azione" style="margin-bottom:8px"><span class="muted">…</span></div>
-    <b>Anche a mano</b>, sul server, nella cartella dello stack:
-    <span class="mono">docker compose restart</span> — oppure
-    <span class="mono">docker restart &lt;nome del container&gt;</span>.
-    In tutti i casi le sessioni aperte (terminale compreso) si chiudono e i dati
-    storici restano.</div>`;
+    <b>${h(t("impostazioni.ancheAMano2"))}</b>, ${t("impostazioni.riavvioAMano")}</div>`;
 }
 
 /* Il pulsante compare solo se c'e' qualcuno che riaccende il servizio: il
@@ -3999,7 +4009,7 @@ async function caricaRiavvio() {
     return;
   }
   box.innerHTML = `<button class="btn" id="riavvio-ora"
-      style="border-color:var(--orange);color:var(--orange)">Riavvia il servizio</button>
+      style="border-color:var(--orange);color:var(--orange)">${h(t("impostazioni.riavviaServizio"))}</button>
     <span class="muted" style="margin-left:8px">${st.reason
       ? h(st.reason)
       : `il container riparte da solo (<span class="mono">restart: ${h(st.policy)}</span>)`}</span>`;
@@ -4009,10 +4019,8 @@ async function caricaRiavvio() {
 async function riavviaServizio(st) {
   // Chi preme non deve scoprire dopo che stava buttando via il lavoro
   // nell'editor: la configurazione non salvata non sopravvive al riavvio.
-  if (cfgSporco() && !confirm("Ci sono modifiche non salvate nella configurazione: "
-      + "il riavvio le perde. Continuare?")) return;
-  const conseguenze = "Tutte le sessioni aperte si chiudono, terminale SSH compreso, "
-    + "e per qualche secondo la dashboard non risponde.";
+  if (cfgSporco() && !confirm(t("impostazioni.riavvioPerde"))) return;
+  const conseguenze = t("impostazioni.sessioniSiChiudono");
   if (!confirm(st.policy
       ? `Riavviare il servizio adesso? ${conseguenze}`
       : `Riavviare il servizio adesso? ${conseguenze}\n\nAttenzione: ${st.reason}.`)) return;
@@ -4021,8 +4029,7 @@ async function riavviaServizio(st) {
     if (!r.ok) return toast(r.error.messaggio, { level: "err", chiave: "riavvio" });
     // Dura quanto basta a coprire il riavvio: un avviso che resta anche dopo
     // che tutto e' tornato a posto e' solo rumore.
-    toast("Riavvio in corso. La dashboard si ricollega da sola appena il servizio "
-      + "torna su.", { level: "info", durata: 20000, chiave: "riavvio" });
+    toast(t("msg.riavvioInCorso"), { level: "info", durata: 20000, chiave: "riavvio" });
   }, "riavvio…");
 }
 
@@ -4050,15 +4057,33 @@ function editorTemi() {
   const attivo = temaAttivo();
   const campione = ["--bg", "--panel-2", "--teal", "--green", "--orange"]
     .map(v => `<i style="background:var(${v})"></i>`).join("");
-  box.innerHTML = TEMI.map(t => `
-    <button class="tema-scelta${t.id === attivo ? " attivo" : ""}" data-tema="${h(t.id)}">
+  box.innerHTML = TEMI.map(tema => `
+    <button class="tema-scelta${tema.id === attivo ? " attivo" : ""}" data-tema="${h(tema.id)}">
       <span class="tema-campione">${campione}</span>
-      <span class="tema-riga"><span class="tema-nome">${h(t.nome)}</span>${
+      <span class="tema-riga"><span class="tema-nome">${h(t(tema.nome))}</span>${
         t.id === attivo ? `<span class="tema-uso">in uso</span>` : ""}</span>
-      <span class="tema-nota">${h(t.nota)}</span>
+      <span class="tema-nota">${h(t(tema.nota))}</span>
     </button>`).join("");
   box.querySelectorAll(".tema-scelta").forEach(b => {
     b.onclick = () => { applicaTema(b.dataset.tema); editorTemi(); };
+  });
+}
+
+function editorLingua() {
+  const box = $("#ed-lingua");
+  if (!box) return;
+  box.innerHTML = I18N.disponibili.map(l => `
+    <button class="btn${l === I18N.lang ? " attivo" : ""}" data-lingua="${h(l)}"
+      ${l === I18N.lang ? 'style="border-color:var(--teal);color:var(--teal)"' : ""}>
+      ${h(t("lingua." + l))}</button>`).join("");
+  box.querySelectorAll("[data-lingua]").forEach(b => {
+    b.onclick = () => {
+      I18N.setLang(b.dataset.lingua);
+      // La cornice (menu, topbar) sta fuori dalla pagina: si ridisegna a parte,
+      // altrimenti resterebbe nella lingua di prima fino a un ricaricamento.
+      I18N.applicaStatico();
+      go(state.route);
+    };
   });
 }
 
@@ -4066,7 +4091,7 @@ async function pageSettings(view) {
   view.innerHTML = `
     ${alertBox("settings")}
     <div class="card" style="margin-bottom:14px">
-      <h3>Aspetto · tema <span class="right muted">solo questo browser, nessun riavvio</span></h3>
+      <h3>${h(t("impostazioni.aspettoTema"))} <span class="right muted">${h(t("impostazioni.soloQuestoBrowser"))}</span></h3>
       <div class="muted" style="font-size:12px;margin-bottom:10px">
         Il tema si applica subito e resta ricordato in questo browser: dal telefono
         puoi usarne uno diverso che dal PC. Senza una scelta si segue il tema del
@@ -4076,7 +4101,12 @@ async function pageSettings(view) {
       <div class="temi" id="ed-temi"></div>
     </div>
     <div class="card" style="margin-bottom:14px">
-      <h3>Password admin <span class="right muted">login dashboard</span></h3>
+      <h3>${h(t("lingua.etichetta"))} <span class="right muted">${h(t("lingua.nota"))}</span></h3>
+      <div class="muted" style="font-size:12px;margin-bottom:10px">${h(t("lingua.spiegazione"))}</div>
+      <div class="controls" style="margin-bottom:0" id="ed-lingua"></div>
+    </div>
+    <div class="card" style="margin-bottom:14px">
+      <h3>${h(t("impostazioni.passwordAdmin"))} <span class="right muted">${h(t("impostazioni.loginDashboard"))}</span></h3>
       <div class="muted" style="font-size:12px;margin-bottom:10px">
         Imposta o cambia la password di accesso (min 6 caratteri), salvata come hash bcrypt nei segreti.
         Il login e' attivo con <code>auth.method: basic</code> e <code>bypass_lan: false</code> in config.yaml
@@ -4085,12 +4115,12 @@ async function pageSettings(view) {
       </div>
       <div class="controls" style="margin-bottom:0">
         <input type="password" id="pw-new" placeholder="nuova password" autocomplete="new-password">
-        <button class="btn" id="pw-save" style="border-color:var(--teal);color:var(--teal)">Salva password</button>
+        <button class="btn" id="pw-save" style="border-color:var(--teal);color:var(--teal)">${h(t("impostazioni.salvaPassword"))}</button>
         <span id="pw-msg" class="muted"></span>
       </div>
     </div>
     <div class="card" style="margin-bottom:14px">
-      <h3>Segreti · secrets.env <span class="right muted">scritti con permessi 600, mai mostrati</span></h3>
+      <h3>${h(t("impostazioni.segreti"))} <span class="right muted">${h(t("impostazioni.segretiNota"))}</span></h3>
       <div class="muted" style="font-size:12px;margin-bottom:10px">
         Password e hash NON stanno in config.yaml ma in <code>secrets.env</code> (priorita' sopra config.yaml).
         Lascia vuoto un campo per non cambiarlo. Richiede il <b>riavvio</b> del servizio
@@ -4099,24 +4129,24 @@ async function pageSettings(view) {
       <div id="sec-fields"><div class="muted">caricamento…</div></div>
       <div id="sec-msg"></div>
       <div class="controls" style="margin-top:12px;margin-bottom:0">
-        <button class="btn" id="sec-save" style="border-color:var(--teal);color:var(--teal)">Salva segreti</button>
+        <button class="btn" id="sec-save" style="border-color:var(--teal);color:var(--teal)">${h(t("impostazioni.salvaSegreti"))}</button>
       </div>
     </div>
     <div class="card" style="margin-bottom:14px">
-      <h3>Personalizzazione · subnet, peer WireGuard, discovery <span class="right muted">richiede riavvio</span></h3>
+      <h3>${h(t("impostazioni.personalizzazione"))} <span class="right muted">richiede riavvio</span></h3>
       <div class="muted" style="font-size:12px;margin-bottom:10px">
         Editor guidati per le sezioni piu' usate di <code>config.yaml</code>. Ogni salvataggio
-        crea un backup e richiede il <b>riavvio del servizio</b> per essere applicato.
+        crea un backup e richiede il <b>${h(t("impostazioni.riavvioServizio"))}</b> per essere applicato.
       </div>
-      <h4 style="margin:6px 0">Subnet (etichette e colori della mappa)</h4>
+      <h4 style="margin:6px 0">${h(t("impostazioni.subnetMappa"))}</h4>
       <div id="ed-subnets" class="muted">…</div>
-      <h4 style="margin:16px 0 6px">Peer WireGuard (chiave pubblica → nome)</h4>
+      <h4 style="margin:16px 0 6px">${h(t("impostazioni.peerWg"))}</h4>
       <div id="ed-wg" class="muted">…</div>
-      <h4 style="margin:16px 0 6px">Discovery SSH (arricchisce OS/servizi per-device)</h4>
+      <h4 style="margin:16px 0 6px">${h(t("impostazioni.discoverySsh"))}</h4>
       <div id="ed-disc" class="muted">…</div>
     </div>
     <div class="card" style="margin-bottom:14px">
-      <h3>Alert silenziati <span class="right muted">nessun riavvio richiesto</span></h3>
+      <h3>${h(t("impostazioni.alertSilenziati"))} <span class="right muted">${h(t("impostazioni.nessunRiavvio"))}</span></h3>
       <div class="muted" style="font-size:12px;margin-bottom:10px">
         Avvisi che non devono piu' suonare, con il motivo per cui li hai zittiti.
         Soggetto vuoto = tutta la regola. Le modifiche valgono entro pochi secondi:
@@ -4125,22 +4155,22 @@ async function pageSettings(view) {
       <div id="ed-alerts" class="muted">…</div>
     </div>
     <div class="card" style="margin-bottom:14px">
-      <h3>Configurazione · config.yaml (avanzato) <span class="right muted mono" id="cfg-path"></span></h3>
+      <h3>${h(t("impostazioni.configAvanzato"))} <span class="right muted mono" id="cfg-path"></span></h3>
       <div class="muted" style="font-size:12px;margin-bottom:10px">
         I segreti (password, hash) sono mascherati con <code>********</code>:
         lascia la maschera per non modificarli. Le modifiche vengono validate e
-        salvate con backup automatico, ma richiedono il <b>riavvio del servizio</b> per essere applicate.
+        salvate con backup automatico, ma richiedono il <b>${h(t("impostazioni.riavvioServizio"))}</b> per essere applicate.
       </div>
       <textarea id="cfg-yaml" class="config-editor" spellcheck="false">caricamento…</textarea>
       <div id="cfg-msg"></div>
       <div class="controls" style="margin-top:12px;margin-bottom:0">
-        <button class="btn" id="cfg-save" style="border-color:var(--teal);color:var(--teal)">Salva</button>
-        <button class="btn" id="cfg-reload">Ricarica</button>
+        <button class="btn" id="cfg-save" style="border-color:var(--teal);color:var(--teal)">${h(t("comune.salva"))}</button>
+        <button class="btn" id="cfg-reload">${h(t("azione.ricarica"))}</button>
         <span class="muted" id="cfg-dirty"></span>
       </div>
       ${notaRiavvio()}
     </div>
-    ${card("Backup configurazione", `<div id="cfg-backups" class="muted">…</div>`)}`;
+    ${card(t("impostazioni.backupConfig"), `<div id="cfg-backups" class="muted">…</div>`)}`;
 
   const msg = (html, cls) => { $("#cfg-msg").innerHTML = html ? `<div class="cfg-note ${cls || ""}">${html}</div>` : ""; };
 
@@ -4158,7 +4188,7 @@ async function pageSettings(view) {
 
   function segnaModifiche() {
     const el = $("#cfg-dirty");
-    if (el) el.textContent = cfgSporco() ? "modifiche non salvate" : "";
+    if (el) el.textContent = cfgSporco() ? t("impostazioni.modificheNonSalvate") : "";
   }
   async function loadBackups() {
     const box = $("#cfg-backups");
@@ -4168,34 +4198,34 @@ async function pageSettings(view) {
       $("#cfg-bak-retry").onclick = loadBackups; return; }
     {
       const d = rb.data;
-      if (!d.backups || !d.backups.length) { box.innerHTML = `<div class="empty">Nessun backup.</div>`; return; }
+      if (!d.backups || !d.backups.length) { box.innerHTML = `<div class="empty">${h(t("impostazioni.nessunBackup"))}</div>`; return; }
       box.innerHTML = `<table><tbody>${d.backups.map(b => `<tr>
         <td class="mono">${h(b.name)}</td>
         <td class="right muted">${new Date(b.mtime * 1000).toLocaleString()}</td>
-        <td class="right"><button class="btn" data-bak="${h(b.name)}">Ripristina</button></td>
+        <td class="right"><button class="btn" data-bak="${h(b.name)}">${h(t("impostazioni.ripristina"))}</button></td>
       </tr>`).join("")}</tbody></table>`;
       box.querySelectorAll("button[data-bak]").forEach(btn => btn.onclick = async () => {
         if (!confirm(`Ripristinare ${btn.dataset.bak}? Lo stato attuale viene comunque salvato in un nuovo backup.`)) return;
         const r = await api(`/api/config/backups/${encodeURIComponent(btn.dataset.bak)}/restore`, { method: "POST" });
-        if (r.ok) { msg("Backup ripristinato. Riavvia il servizio per applicare.", "ok"); load(); loadBackups(); }
+        if (r.ok) { msg(t("impostazioni.backupRipristinato"), "ok"); load(); loadBackups(); }
         else msg(h(r.error.messaggio), "err");
       });
     }
   }
 
   $("#cfg-save").onclick = () => conPulsante($("#cfg-save"), async () => {
-    msg("Salvataggio…");
+    msg(t("impostazioni.salvataggio"));
     const testo = $("#cfg-yaml").value;
     const r = await api("/api/config/", { method: "PUT", body: { yaml: testo } });
     if (r.ok) {
       cfgSalvato = testo;
       segnaModifiche();
-      msg("Salvato. <b>Riavvia il servizio</b> per applicare le modifiche.", "ok");
+      msg(t("impostazioni.salvatoRiavvia", { riavvia: t("impostazioni.riavviaServizio") }), "ok");
       loadBackups();
-    } else msg("Non salvato — " + h(r.error.messaggio), "err");
+    } else msg(t("impostazioni.nonSalvato") + h(r.error.messaggio), "err");
   });
   $("#cfg-reload").onclick = () => {
-    if (cfgSporco() && !confirm("Ci sono modifiche non salvate: ricaricare e perderle?")) return;
+    if (cfgSporco() && !confirm(t("chiedi.ricaricaPerdeModifiche"))) return;
     return load();
   };
   $("#cfg-yaml").oninput = segnaModifiche;
@@ -4212,37 +4242,37 @@ async function pageSettings(view) {
     {
       const d = rs.data;
       $("#sec-fields").innerHTML = `<table><tbody>${(d.secrets || []).map(s => `<tr>
-        <td>${h(s.label)} <span class="tag ${s.set ? "green" : ""}">${s.set ? "impostato" : "non impostato"}</span></td>
+        <td>${h(s.label)} <span class="tag ${s.set ? "green" : ""}">${h(s.set ? t("impostazioni.impostato") : t("impostazioni.nonImpostato"))}</span></td>
         <td><input type="password" class="sec-in" data-id="${h(s.id)}" autocomplete="new-password"
              placeholder="${s.set ? "•••••• (lascia vuoto per non cambiare)" : "inserisci valore"}"
              style="width:100%;background:var(--bg-2);border:1px solid var(--border-2);color:var(--text);border-radius:7px;padding:7px 10px"></td>
-        ${s.set ? `<td class="right"><button class="iconbtn" title="Rimuovi" data-clear="${h(s.id)}">✕</button></td>` : "<td></td>"}
+        ${s.set ? `<td class="right"><button class="iconbtn" title="${h(t("comune.rimuovi"))}" data-clear="${h(s.id)}">✕</button></td>` : "<td></td>"}
       </tr>`).join("")}</tbody></table>`;
       $("#sec-fields").querySelectorAll("button[data-clear]").forEach(b => b.onclick = async () => {
-        if (!confirm("Rimuovere questo segreto?")) return;
+        if (!confirm(t("chiedi.rimuoviSegreto"))) return;
         await putSecrets({ [b.dataset.clear]: "__CLEAR__" });
       });
     }
   }
   async function putSecrets(values) {
     const r = await api("/api/config/secrets", { method: "PUT", body: { values } });
-    if (r.ok) { secMsg("Segreti salvati. <b>Riavvia il servizio</b> per applicare.", "ok"); loadSecrets(); }
+    if (r.ok) { secMsg(t("impostazioni.segretiSalvati", { riavvia: t("impostazioni.riavviaServizio") }), "ok"); loadSecrets(); }
     else secMsg(h(r.error.messaggio), "err");
   }
   $("#sec-save").onclick = () => conPulsante($("#sec-save"), async () => {
     const values = {};
     $("#sec-fields").querySelectorAll("input.sec-in").forEach(i => { if (i.value) values[i.dataset.id] = i.value; });
-    if (!Object.keys(values).length) { secMsg("Nessun campo compilato.", ""); return; }
+    if (!Object.keys(values).length) { secMsg(t("impostazioni.nessunCampo"), ""); return; }
     await putSecrets(values);
   });
 
   $("#pw-save").onclick = () => conPulsante($("#pw-save"), async () => {
     const p = $("#pw-new").value, m = $("#pw-msg");
-    if (p.length < 6) { m.textContent = "Minimo 6 caratteri."; return; }
+    if (p.length < 6) { m.textContent = t("impostazioni.minimo6"); return; }
     // auth:false: se la sessione e' scaduta il pannello di login servirebbe la
     // password che si sta cambiando proprio qui.
     const r = await api("/api/auth/password", { method: "POST", body: { password: p }, auth: false });
-    if (r.ok) { m.textContent = "Password salvata."; $("#pw-new").value = ""; }
+    if (r.ok) { m.textContent = t("impostazioni.passwordSalvata"); $("#pw-new").value = ""; }
     else m.textContent = r.error.messaggio;
   });
 
@@ -4252,7 +4282,7 @@ async function pageSettings(view) {
     // Il backend dice se serve davvero un riavvio: alcune sezioni le rilegge da
     // solo, e chiedere un riavvio che non serve e' un modo per non farsi credere.
     if (r.ok) setMsg(r.data.restart_required === false
-      ? "Salvato: gia' attivo." : "Salvato. Riavvia il servizio per applicare.", "ok");
+      ? t("impostazioni.giaAttivo") : t("impostazioni.salvatoRiavviaBreve"), "ok");
     else setMsg(r.error.messaggio, "err");
   }
   const rowMsg = (id, m, cls) => { const el = $("#" + id); if (el) { el.className = "muted " + (cls === "ok" ? "ok" : cls === "err" ? "err" : ""); el.textContent = m; } };
@@ -4263,7 +4293,7 @@ async function pageSettings(view) {
     if (!rsubnets.ok) { box.innerHTML = noteErrore(rsubnets.error); return; }
     let val = rsubnets.data.value || [];
     const render = () => {
-      box.innerHTML = `<table><thead><tr><th>CIDR</th><th>Etichetta</th><th>Colore</th><th>Scan</th><th></th></tr></thead><tbody>${
+      box.innerHTML = `<table><thead><tr><th>CIDR</th><th>${h(t("comune.etichetta"))}</th><th>${h(t("impostazioni.colore"))}</th><th>${h(t("impostazioni.scan"))}</th><th></th></tr></thead><tbody>${
         val.map((s, i) => `<tr>
           <td><input class="sn-in mono" data-i="${i}" data-k="cidr" value="${h(s.cidr || "")}" style="width:130px"></td>
           <td><input class="sn-in" data-i="${i}" data-k="label" value="${h(s.label || "")}" style="width:100px"></td>
@@ -4272,7 +4302,7 @@ async function pageSettings(view) {
           <td class="right"><button class="iconbtn" data-del="${i}">✕</button></td></tr>`).join("")
       }</tbody></table>
       <div class="controls" style="margin-top:8px;margin-bottom:0"><button class="btn" id="sn-add">+ subnet</button>
-        <button class="btn" id="sn-save" style="border-color:var(--teal);color:var(--teal)">Salva subnet</button><span id="sn-msg" class="muted"></span></div>`;
+        <button class="btn" id="sn-save" style="border-color:var(--teal);color:var(--teal)">${h(t("impostazioni.salvaSubnet"))}</button><span id="sn-msg" class="muted"></span></div>`;
       box.querySelectorAll(".sn-in").forEach(inp => inp.oninput = () => { val[inp.dataset.i][inp.dataset.k] = inp.value; });
       box.querySelectorAll(".sn-col").forEach(inp => inp.oninput = () => { val[inp.dataset.i].color = inp.value; });
       box.querySelectorAll(".sn-ck").forEach(ck => ck.onchange = () => { val[ck.dataset.i].scan = ck.checked; });
@@ -4290,14 +4320,14 @@ async function pageSettings(view) {
     let obj = rwg_peers.data.value || {};
     let rows = Object.entries(obj || {}).map(([pub, name]) => ({ pub, name }));
     const render = () => {
-      box.innerHTML = `<table><thead><tr><th>Chiave pubblica</th><th>Nome</th><th></th></tr></thead><tbody>${
+      box.innerHTML = `<table><thead><tr><th>${h(t("impostazioni.chiavePubblica"))}</th><th>${h(t("comune.nome"))}</th><th></th></tr></thead><tbody>${
         rows.map((r, i) => `<tr>
           <td><input class="wg-in mono" data-i="${i}" data-k="pub" value="${h(r.pub)}" style="width:100%;min-width:220px"></td>
           <td><input class="wg-in" data-i="${i}" data-k="name" value="${h(r.name)}"></td>
           <td class="right"><button class="iconbtn" data-del="${i}">✕</button></td></tr>`).join("")
       }</tbody></table>
       <div class="controls" style="margin-top:8px;margin-bottom:0"><button class="btn" id="wg-add">+ peer</button>
-        <button class="btn" id="wg-save" style="border-color:var(--teal);color:var(--teal)">Salva peer</button><span id="wg-msg" class="muted"></span></div>`;
+        <button class="btn" id="wg-save" style="border-color:var(--teal);color:var(--teal)">${h(t("impostazioni.salvaPeer"))}</button><span id="wg-msg" class="muted"></span></div>`;
       box.querySelectorAll(".wg-in").forEach(inp => inp.oninput = () => { rows[inp.dataset.i][inp.dataset.k] = inp.value; });
       box.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { rows.splice(+b.dataset.del, 1); render(); });
       $("#wg-add", box).onclick = () => { rows.push({ pub: "", name: "" }); render(); };
@@ -4319,9 +4349,9 @@ async function pageSettings(view) {
       box.innerHTML = `
         <label class="muted" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="dsc-en" ${d.enabled ? "checked" : ""}> abilitata (raccoglie OS/servizi/docker dagli host via SSH)</label>
         <div class="controls" style="margin:8px 0">
-          <input id="dsc-user" placeholder="utente SSH di default" value="${h(d.default_user || "")}">
-          <input id="dsc-key" class="mono" placeholder="path chiave di default" value="${h(d.default_key || "")}" style="min-width:220px"></div>
-        <table><thead><tr><th>Host (IP)</th><th>Utente</th><th>Chiave (opz.)</th><th>Sistema</th><th></th></tr></thead><tbody>${
+          <input id="dsc-user" placeholder="${h(t("impostazioni.utenteSshDefault"))}" value="${h(d.default_user || "")}">
+          <input id="dsc-key" class="mono" placeholder="${h(t("impostazioni.pathChiaveDefault"))}" value="${h(d.default_key || "")}" style="min-width:220px"></div>
+        <table><thead><tr><th>${h(t("impostazioni.hostIp"))}</th><th>${h(t("comune.utente"))}</th><th>${h(t("impostazioni.chiaveOpz"))}</th><th>${h(t("impostazioni.sistema"))}</th><th></th></tr></thead><tbody>${
           d.hosts.map((hh, i) => `<tr>
             <td><input class="dsc-in mono" data-i="${i}" data-k="ip" value="${h(hh.ip || "")}"></td>
             <td><input class="dsc-in" data-i="${i}" data-k="user" value="${h(hh.user || "")}" placeholder="(default)"></td>
@@ -4332,12 +4362,12 @@ async function pageSettings(view) {
             }</select></td>
             <td class="right"><button class="iconbtn" data-del="${i}">✕</button></td></tr>`).join("")
         }</tbody></table>
-        <div class="muted" style="font-size:12px">Sistema: con <span class="mono">auto</span> LANMng
+        <div class="muted" style="font-size:12px">${h(t("impostazioni.sistemaCon"))} <span class="mono">auto</span> LANMng
           lo scopre da solo alla prima connessione. Serve dichiararlo solo se sbaglia: un host Windows
           risponde via SSH con <span class="mono">cmd.exe</span>, dove i comandi Linux non danno un
           errore ma una risposta senza senso.</div>
         <div class="controls" style="margin-top:8px;margin-bottom:0"><button class="btn" id="dsc-add">+ host</button>
-          <button class="btn" id="dsc-save" style="border-color:var(--teal);color:var(--teal)">Salva discovery</button><span id="dsc-msg" class="muted"></span></div>`;
+          <button class="btn" id="dsc-save" style="border-color:var(--teal);color:var(--teal)">${h(t("impostazioni.salvaDiscovery"))}</button><span id="dsc-msg" class="muted"></span></div>`;
       // Anche `change`: un <select> non emette `input` su tutti i browser.
       box.querySelectorAll(".dsc-in").forEach(inp => {
         const aggiorna = () => { d.hosts[inp.dataset.i][inp.dataset.k] = inp.value; };
@@ -4375,16 +4405,16 @@ async function pageSettings(view) {
       `<option value="${h(r.rule)}" title="${h(r.descr)}"${r.rule === sel ? " selected" : ""}>${h(r.rule)}</option>`).join("");
     const render = () => {
       box.innerHTML = `${val.length ? `<table><thead><tr>
-          <th>Regola</th><th>Soggetto</th><th>Motivo</th><th>Dal</th><th></th></tr></thead><tbody>${
+          <th>${h(t("alert.regola"))}</th><th>${h(t("alert.soggetto"))}</th><th>${h(t("alert.motivo"))}</th><th>${h(t("impostazioni.dal"))}</th><th></th></tr></thead><tbody>${
           val.map((x, i) => `<tr>
             <td><select class="al-in" data-i="${i}" data-k="rule">${opzioni(x.rule)}</select></td>
             <td><input class="al-in mono" data-i="${i}" data-k="subject" value="${h(x.subject || "")}" placeholder="(tutta la regola)"></td>
             <td><input class="al-in" data-i="${i}" data-k="reason" value="${h(x.reason || "")}" style="width:100%;min-width:180px"></td>
             <td class="muted nowrap">${x.since ? h(new Date(x.since * 1000).toLocaleDateString()) : "—"}</td>
             <td class="right"><button class="iconbtn" data-del="${i}">✕</button></td></tr>`).join("")
-        }</tbody></table>` : `<div class="empty">Nessun avviso silenziato.</div>`}
+        }</tbody></table>` : `<div class="empty">${h(t("impostazioni.nessunSilenziato"))}</div>`}
         <div class="controls" style="margin-top:8px;margin-bottom:0"><button class="btn" id="al-add">+ silenziamento</button>
-          <button class="btn" id="al-save" style="border-color:var(--teal);color:var(--teal)">Salva</button><span id="al-msg" class="muted"></span></div>`;
+          <button class="btn" id="al-save" style="border-color:var(--teal);color:var(--teal)">${h(t("comune.salva"))}</button><span id="al-msg" class="muted"></span></div>`;
       box.querySelectorAll(".al-in").forEach(inp => inp.oninput = inp.onchange =
         () => { val[inp.dataset.i][inp.dataset.k] = inp.value; });
       box.querySelectorAll("[data-del]").forEach(b => b.onclick = () => { val.splice(+b.dataset.del, 1); render(); });
@@ -4400,6 +4430,7 @@ async function pageSettings(view) {
   }
 
   editorTemi();
+  editorLingua();
   load(); loadBackups(); loadSecrets(); loadSubnets(); loadWg(); loadDisc(); loadSilenced();
   caricaRiavvio();
 }
@@ -4547,7 +4578,7 @@ function drawLineChart(canvas, series, lines, opts = {}) {
   if (n < 2) {   // senza dati non si etichetta una scala inventata
     ctx.fillStyle = pal.faint; ctx.textAlign = "left";
     ctx.textBaseline = "middle"; ctx.font = "12px monospace";
-    ctx.fillText("in attesa di dati…", x0 + 6, (y0 + y1) / 2);
+    ctx.fillText(t("grafico.attesaDati"), x0 + 6, (y0 + y1) / 2);
     return;
   }
 
@@ -5125,10 +5156,10 @@ function buildMapDom() {
         : (n.online ? subnetColor(n.subnet, pal.muted) : pal.off)));
     c.setAttribute("stroke-width", n.router ? 2.5 : (n.hub ? 2.5 : 2));
     if (n.hub) c.setAttribute("stroke-dasharray", "3 2");
-    const t = document.createElementNS(SVGNS, "text");
-    t.setAttribute("text-anchor", "middle"); t.setAttribute("dy", "0.35em");
-    t.setAttribute("font-size", n.router ? 16 : (n.hub ? 13 : 12)); t.setAttribute("fill", pal.text);
-    t.textContent = n.hub ? "◈" : (ICON[n.type] || "○");
+    const glifo = document.createElementNS(SVGNS, "text");
+    glifo.setAttribute("text-anchor", "middle"); glifo.setAttribute("dy", "0.35em");
+    glifo.setAttribute("font-size", n.router ? 16 : (n.hub ? 13 : 12)); glifo.setAttribute("fill", pal.text);
+    glifo.textContent = n.hub ? "◈" : (ICON[n.type] || "○");
     const lbl = document.createElementNS(SVGNS, "text");
     lbl.setAttribute("text-anchor", "middle"); lbl.setAttribute("dy", n.router ? "38" : (n.hub ? "31" : "27"));
     lbl.setAttribute("font-size", 11);
@@ -5136,7 +5167,7 @@ function buildMapDom() {
       : (n.online === false ? pal.faint : pal.muted));
     lbl.setAttribute("font-family", "ui-monospace, monospace");
     lbl.textContent = (n.name || "").slice(0, 16);
-    g.append(c, t, lbl); n.el = g; n.dot = c;
+    g.append(c, glifo, lbl); n.el = g; n.dot = c;
     svg.appendChild(g);
   });
 }
@@ -5330,7 +5361,93 @@ function spostaVistaMappa(ev) {
 /* ===================================================================
    AVVIO
    =================================================================== */
+/* ── Primo avvio guidato ────────────────────────────────────────────
+   Senza config.yaml l'app non sa niente della rete: `subnets` e' vuota, quindi
+   la discovery non cerca da nessuna parte e la dashboard resta vuota senza
+   spiegare perche'. Questa pagina scrive la configurazione iniziale.
+   Le subnet proposte vengono dalle interfacce dell'host: se non si leggono, si
+   lascia il campo vuoto invece di indovinare una rete. */
+/* Unico indirizzo scritto a mano nel frontend, e con un motivo: al primo avvio
+   non esiste ancora una configurazione da cui ricavare un esempio, e un campo
+   CIDR vuoto non dice che forma deve avere il valore. E' un esempio di
+   FORMATO, non un suggerimento su una rete esistente: si sceglie la subnet
+   domestica piu' comune proprio perche' sia riconoscibile a colpo d'occhio.
+   Ovunque ci sia una config, l'esempio si ricava da quella (vedi esempioIP). */
+const SETUP_CIDR_ESEMPIO = "192.168.1.0/24";
+
+async function renderSetup() {
+  const rs = await api("/api/setup/suggest", { auth: false, retry: false });
+  const proposte = (rs.ok && rs.data.subnets) || [];
+  const nota = rs.ok
+    ? (proposte.length
+        ? t("setup.proposta")
+        : t("setup.nessunaProposta", { esempio: SETUP_CIDR_ESEMPIO }))
+    : rs.error.messaggio;
+
+  document.body.innerHTML = `<div class="login-wrap"><form class="card login" id="setup"
+      style="width:460px">
+    <div class="brand" style="justify-content:center;margin-bottom:6px"><span class="dot"></span> LANMng</div>
+    <div class="muted" style="text-align:center;margin-bottom:14px">${h(t("setup.titolo"))}</div>
+    <div class="muted" style="font-size:12px;margin-bottom:10px">${h(nota)}</div>
+    <div id="sw-subnets"></div>
+    <button type="button" class="btn" id="sw-add" style="margin-bottom:12px">${h(t("setup.aggiungiRete"))}</button>
+    <details style="margin-bottom:12px">
+      <summary class="muted" style="cursor:pointer;font-size:12px">${h(t("setup.routerFacoltativo"))}</summary>
+      <div class="muted" style="font-size:12px;margin:8px 0">
+        ${h(t("setup.routerSpiegazione"))}</div>
+      <label>${h(t("setup.indirizzo"))}<input type="text" id="sw-rhost" class="mono" placeholder="${h(proposte.length ? proposte[0].cidr.replace(/\.\d+\/\d+$/, ".1") : "")}"></label>
+      <label>${h(t("setup.utenteSsh"))}<input type="text" id="sw-ruser" value="root"></label>
+    </details>
+    <div id="sw-msg" class="cfg-note err" style="display:none"></div>
+    <button class="btn" type="submit" style="width:100%;border-color:var(--teal);color:var(--teal)">${h(t("setup.salva"))}</button>
+  </form></div>`;
+
+  const box = $("#sw-subnets");
+  const riga = (cidr = "", label = "") => {
+    const d = document.createElement("div");
+    d.className = "sw-riga";
+    d.innerHTML = `<input type="text" class="mono sw-cidr" placeholder="${SETUP_CIDR_ESEMPIO}" value="${h(cidr)}">
+      <input type="text" class="sw-label" placeholder="${h(t("setup.nome"))}" value="${h(label)}">
+      <button type="button" class="btn sw-del" title="${h(t("setup.togli"))}">✕</button>`;
+    $(".sw-del", d).onclick = () => d.remove();
+    box.appendChild(d);
+  };
+  if (proposte.length) proposte.forEach(p => riga(p.cidr, p.label));
+  else riga();
+  $("#sw-add").onclick = () => riga();
+
+  const msg = (testo) => { const m = $("#sw-msg"); m.textContent = testo; m.style.display = ""; };
+  $("#setup").onsubmit = async (e) => {
+    e.preventDefault();
+    const subnets = [...document.querySelectorAll(".sw-riga")]
+      .map((d, i) => ({ cidr: $(".sw-cidr", d).value.trim(),
+                        label: $(".sw-label", d).value.trim() || (i === 0 ? "LAN" : `LAN ${i + 1}`),
+                        scan: true }))
+      .filter(s => s.cidr);
+    if (!subnets.length) return msg(t("setup.serveUnaRete"));
+    const rhost = $("#sw-rhost").value.trim();
+    const body = { subnets };
+    if (rhost) body.router = { host: rhost, user: $("#sw-ruser").value.trim() || "root" };
+    const r = await api("/api/setup", { method: "POST", body, auth: false });
+    if (!r.ok) return msg(r.error.messaggio);
+    // La configurazione si legge all'avvio: finche' il servizio non riparte,
+    // la dashboard mostrerebbe ancora zero subnet. Meglio dirlo che far
+    // credere che il salvataggio non abbia funzionato.
+    document.body.innerHTML = `<div class="login-wrap"><div class="card login" style="width:460px">
+      <div class="brand" style="justify-content:center;margin-bottom:10px"><span class="dot"></span> LANMng</div>
+      <p>${h(tp("setup.salvata", subnets.length))}</p>
+      <p class="muted">${h(t("setup.riavvia"))}</p>
+      <button class="btn" style="width:100%" onclick="location.reload()">${h(t("azione.ricarica"))}</button>
+    </div></div>`;
+  };
+}
+
 async function boot() {
+  // Primo avvio: senza configurazione non c'e' niente da mostrare, e il login
+  // arriverebbe prima di sapere quale rete guardare.
+  const rsetup = await api("/api/setup/status", { auth: false, retry: false, timeout: 4000 });
+  if (rsetup.ok && rsetup.data.setup_required) return renderSetup();
+
   // Gate auth: se serve il login e non siamo autenticati, mostra la pagina di login.
   // Budget corto e nessun ritentativo: con il backend spento i due tentativi
   // da 12s lascerebbero la pagina bianca per mezzo minuto prima di disegnare
@@ -5346,7 +5463,7 @@ async function boot() {
     // Prima si proseguiva in silenzio: la dashboard si disegnava vuota e
     // nessuna pagina spiegava perche'.
     toast(rst.error.messaggio, { level: "err", durata: 0, chiave: "boot",
-      azione: { label: "Ricarica", onclick: () => location.reload() } });
+      azione: { label: t("azione.ricarica"), onclick: () => location.reload() } });
   }
   bindMobileNav();
   bindAlert();
@@ -5389,7 +5506,7 @@ function renderSecurityBanner(reasons) {
   const el = $("#sec-banner");
   if (!el) return;
   if (!Array.isArray(reasons) || !reasons.length) { el.hidden = true; el.innerHTML = ""; return; }
-  el.innerHTML = `<b>Attenzione: dashboard senza autenticazione.</b>
+  el.innerHTML = `<b>${h(t("sicurezza.bannerTitolo"))}</b>
     <ul>${reasons.map(r => `<li>${h(r)}</li>`).join("")}</ul>`;
   el.hidden = false;
 }
@@ -5406,17 +5523,15 @@ function renderLogin(st) {
   const first = !st.password_set;
   document.body.innerHTML = `<div class="login-wrap"><form class="card login" id="login">
     <div class="brand" style="justify-content:center;margin-bottom:6px"><span class="dot"></span> LANMng</div>
-    <div class="muted" style="text-align:center;margin-bottom:14px">${first
-      ? "Primo accesso: imposta la password admin (almeno 6 caratteri)"
-      : "Accedi per continuare"}</div>
-    <label>Utente<input type="text" id="lg-user" value="${h(st.username || "admin")}"></label>
-    <label>Password<input type="password" id="lg-pass" autocomplete="${first ? "new-password" : "current-password"}"></label>
-    ${first ? `<label>Ripeti la password<input type="password" id="lg-pass2"
+    <div class="muted" style="text-align:center;margin-bottom:14px">${h(first ? t("login.primoAccesso") : t("login.accedi"))}</div>
+    <label>${h(t("login.utente"))}<input type="text" id="lg-user" value="${h(st.username || "admin")}"></label>
+    <label>${h(t("login.password"))}<input type="password" id="lg-pass" autocomplete="${first ? "new-password" : "current-password"}"></label>
+    ${first ? `<label>${h(t("login.ripetiPassword"))}<input type="password" id="lg-pass2"
       autocomplete="new-password"></label>` : ""}
     <div id="lg-msg" class="cfg-note err" style="display:none"></div>
-    <button class="btn" type="submit" style="width:100%;border-color:var(--teal);color:var(--teal);margin-top:6px">${first ? "Imposta ed entra" : "Entra"}</button>
+    <button class="btn" type="submit" style="width:100%;border-color:var(--teal);color:var(--teal);margin-top:6px">${h(first ? t("login.impostaEntra") : t("login.entra"))}</button>
   </form></div>`;
-  const msg = (t) => { const m = $("#lg-msg"); m.textContent = t; m.style.display = ""; };
+  const msg = (testo) => { const m = $("#lg-msg"); m.textContent = testo; m.style.display = ""; };
   $("#lg-pass").focus();
   $("#login").onsubmit = async (e) => {
     e.preventDefault();
@@ -5425,8 +5540,8 @@ function renderLogin(st) {
       // La password si scrive due volte perche' non si vede: un refuso al
       // primo accesso chiuderebbe fuori dalla dashboard chi la sta creando, e
       // per rientrare servirebbe mettere le mani nei file sul server.
-      if (pass !== $("#lg-pass2").value) return msg("Le due password non coincidono.");
-      if (pass.length < 6) return msg("Password troppo corta: minimo 6 caratteri.");
+      if (pass !== $("#lg-pass2").value) return msg(t("login.nonCoincidono"));
+      if (pass.length < 6) return msg(t("login.troppoCorta", { n: 6 }));
       const rp = await api("/api/auth/password", { method: "POST", body: { password: pass }, auth: false });
       if (!rp.ok) return msg(rp.error.messaggio);
     }

@@ -9,6 +9,7 @@ from middleware.auth import (
     COOKIE, TTL, auth_enabled, hash_password, is_authenticated, is_lan,
     make_token, password_set, security_warnings, session_valid, verify_password,
 )
+from services.i18n import t
 from services.ratelimit import RateLimiter
 from services.secrets_store import get_secrets_store
 
@@ -52,12 +53,12 @@ async def auth_status(request: Request):
 async def login(body: LoginBody, response: Response, request: Request):
     ip = _client_ip(request)
     if not _login_rl.allowed(ip):
-        raise HTTPException(status_code=429, detail="troppi tentativi, riprova piu' tardi",
+        raise HTTPException(status_code=429, detail=t("err.troppiTentativi"),
                             headers={"Retry-After": str(_login_rl.retry_after(ip))})
     if (body.username and body.username != settings.auth.username) \
             or not verify_password(body.password):
         _login_rl.hit(ip)
-        raise HTTPException(status_code=401, detail="credenziali non valide")
+        raise HTTPException(status_code=401, detail=t("err.credenziali"))
     _login_rl.reset(ip)
     response.set_cookie(COOKIE, make_token(settings.auth.username),
                         httponly=True, samesite="lax", max_age=TTL)
@@ -78,8 +79,8 @@ async def set_password(body: PasswordBody, request: Request):
     ancora impostata) da una richiesta proveniente dalla LAN."""
     bootstrap = (not password_set()) and request.client and is_lan(request.client.host)
     if not is_authenticated(request) and not bootstrap:
-        raise HTTPException(status_code=401, detail="non autorizzato")
+        raise HTTPException(status_code=401, detail=t("err.nonAutorizzato"))
     if len(body.password) < 6:
-        raise HTTPException(status_code=400, detail="password troppo corta (minimo 6 caratteri)")
+        raise HTTPException(status_code=400, detail=t("err.passwordCorta", n=6))
     get_secrets_store().update({"admin_password_hash": hash_password(body.password)})
     return {"ok": True, "restart_required": False}

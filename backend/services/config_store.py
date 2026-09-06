@@ -292,6 +292,23 @@ class ConfigStore:
         self._write_with_backup(merged)
         return {"ok": True, "restart_required": True}
 
+    def scrivi_iniziale(self, data: dict) -> dict:
+        """Scrive il config.yaml del primo avvio, quando ancora non esiste.
+
+        Non passa da `save_yaml` perche' quello fonde con `_load_raw()`, che in
+        assenza del file ripiega sul template `.example`: il primo avvio
+        erediterebbe le subnet di documentazione e il router d'esempio, cioe'
+        una rete che non e' quella dell'utente.
+        """
+        if self.path.exists():
+            raise ValueError("config.yaml esiste gia': modificalo da Impostazioni")
+        try:
+            Settings(**data)
+        except (ValidationError, ValueError, TypeError) as e:
+            raise ValueError(f"Configurazione non valida: {e}")
+        self._write_with_backup(data)
+        return {"ok": True, "restart_required": True}
+
     def _write_with_backup(self, data: dict):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         if self.path.exists():

@@ -94,6 +94,17 @@ tools:
   # Registro da cui parte il whois: da li' si segue il rimando a quello giusto.
   whois_server: "whois.iana.org"
 
+# ── Interfaccia ───────────────────────────────────────────────────
+#  Preferenze che valgono per ogni browser che apre la dashboard.
+ui:
+  # Lingua predefinita del servizio: "it" o "en". Vuoto (predefinito) vuol dire
+  # che ogni browser usa la propria lingua, con l'inglese come ripiego.
+  #
+  # E' un DEFAULT, non un obbligo: chi sceglie la lingua dalla dashboard vince,
+  # e la sua scelta resta nel suo browser. Serve a chi installa per un'altra
+  # persona, o per se' su piu' dispositivi, senza doverla reimpostare ovunque.
+  default_language: ""
+
 # ── Autenticazione (login admin singolo) ──────────────────────────
 #  method "basic" attiva il login. La password si imposta dalla UI
 #  (Impostazioni -> Password admin): viene salvata come hash bcrypt nei

@@ -7,12 +7,8 @@ piccolo ufficio. Gira in Docker, e' raggiungibile **solo dalla rete privata**, e
 pensata per essere configurata dalla sua stessa interfaccia web invece che
 modificando file.
 
-> **Versione 1.0.0** — il primo rilascio pubblico. Vedi [CHANGELOG.md](CHANGELOG.md).
->
-> Cosa non c'e' in questa release, detto chiaramente: la procedura guidata di
-> primo avvio descritta sotto non e' ancora stata costruita, quindi la
-> configurazione iniziale si fa copiando e modificando un modello, e
-> l'interfaccia per ora e' solo in italiano. Entrambe arrivano con la `1.1.0`.
+> **Versione 1.1.0** — interfaccia in italiano e inglese, e primo avvio guidato.
+> Vedi [CHANGELOG.md](CHANGELOG.md).
 
 ## Cosa fa
 
@@ -53,8 +49,11 @@ modificando file.
    cambia la configurazione — possibilmente dall'interfaccia — e nient'altro.
 3. **Solo rete privata.** Non e' fatta per stare su internet, e la documentazione
    continuera' a dirlo.
-4. **Bilingue.** Inglese e italiano, con cambio al volo, su interfaccia, messaggi
-   d'errore dell'API, configurazione di esempio e documentazione.
+4. **Bilingue.** Italiano e inglese su interfaccia, messaggi d'errore dell'API,
+   configurazione di esempio e documentazione. La lingua si cambia al volo,
+   senza ricaricare, e la scelta resta nel tuo browser — dal telefono puoi
+   usarne una diversa che dal PC. Con `ui.default_language` si sceglie quella
+   predefinita per tutti; chi sceglie dalla dashboard vince comunque.
 
 ## Requisiti
 
@@ -68,18 +67,18 @@ modificando file.
 ```sh
 git clone https://github.com/Yul-1/LAN-Manager.git
 cd LAN-Manager
-
-# La tua configurazione. Modifica almeno il blocco `subnets`: il file esce con
-# intervalli di documentazione RFC 5737, che apposta non corrispondono a nessuna
-# rete vera.
-cp config/config.example.it.yaml config/config.yaml
-
 docker compose up --build
 ```
 
-La dashboard e' poi sulla porta 80 dell'host. Alla prima visita chiede di
-scegliere la password di amministratore, che viene salvata come hash bcrypt in
+La dashboard e' poi sulla porta 80 dell'host, e ti guida lei per il resto:
+propone le reti da monitorare leggendo le interfacce di questa macchina, chiede
+il router se ne hai uno, e scrive la configurazione al posto tuo. Poi chiede di
+scegliere la password di amministratore, salvata come hash bcrypt in
 `config/secrets.env` e mai in `config.yaml`.
+
+Se preferisci configurare a mano, copia `config/config.example.it.yaml` in
+`config/config.yaml` e modificalo prima del primo avvio: la procedura guidata si
+fa da parte appena una configurazione esiste.
 
 Se l'host ha gia' un suo nginx sulla porta 80, si usa il profilo alternativo
 `deploy/docker-compose.host-nginx.yml`, che avvia il solo backend e lascia al tuo

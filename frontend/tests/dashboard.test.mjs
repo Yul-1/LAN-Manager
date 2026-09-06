@@ -11,11 +11,12 @@
    che li raccogliesse. Il test 2 e' li' apposta perche' non torni.
    =================================================================== */
 import { readFileSync } from "node:fs";
+import { SORGENTE_APP } from "./sorgente.mjs";
 import { createContext, runInContext } from "node:vm";
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const SORGENTE = readFileSync(new URL("../app.js", import.meta.url), "utf8")
+const SORGENTE = SORGENTE_APP
   + "\n;globalThis.__interni = { state, PAGES };";
 const CSS = readFileSync(new URL("../styles.css", import.meta.url), "utf8");
 const HTML = readFileSync(new URL("../index.html", import.meta.url), "utf8");
@@ -388,7 +389,7 @@ test("la sidebar ha icone disegnate, non glifi che si somigliano", () => {
 });
 
 test("le voci di menu sono raggruppate", () => {
-  const sez = HTML.match(/<div class="nav-sez">([^<]+)<\/div>/g) || [];
+  const sez = HTML.match(/<div class="nav-sez"[^>]*>([^<]+)<\/div>/g) || [];
   assert.equal(sez.length, 4);
   assert.match(CSS, /\.nav-sez\s*\{/);
 });

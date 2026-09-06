@@ -13,6 +13,8 @@ from __future__ import annotations
 
 import pytest
 
+from services.i18n import t
+
 from config import settings
 from middleware.auth import COOKIE, make_token
 
@@ -78,7 +80,7 @@ def test_una_configurazione_permissiva_si_vede_nello_stato(client, monkeypatch):
 def test_senza_cookie_ogni_gruppo_risponde_401(client, rotta):
     r = client.get(rotta)
     assert r.status_code == 401, f"{rotta} risponde {r.status_code}"
-    assert r.json()["detail"] == "non autenticato"
+    assert r.json()["detail"] == t("err.nonAutenticato", lingua="en")
 
 
 def test_un_cookie_non_firmato_non_basta(client):
@@ -146,7 +148,7 @@ def test_senza_password_admin_le_rotte_sensibili_rispondono_503(
     monkeypatch.setattr(settings.auth, "password_hash", "")
     r = auth_client.get(rotta)
     assert r.status_code == 503
-    assert "password admin" in r.json()["detail"]
+    assert r.json()["detail"] == t("err.servePasswordAdmin", lingua="en")
 
 
 def test_con_la_sessione_le_rotte_sensibili_rispondono(auth_client):
@@ -159,7 +161,7 @@ def test_con_la_sessione_le_rotte_sensibili_rispondono(auth_client):
 def test_una_origine_estranea_sulle_scritture_e_respinta(auth_client, origine_estranea):
     r = auth_client.post("/api/devices/scan", headers=origine_estranea)
     assert r.status_code == 403
-    assert r.json()["detail"] == "origine non consentita"
+    assert r.json()["detail"] == t("err.origineNonConsentita", lingua="en")
 
 
 def test_lorigine_estranea_e_respinta_anche_ad_auth_spenta(

@@ -28,6 +28,7 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from config import settings
+from services.i18n import t
 from services.secrets_store import get_secrets_store
 
 log = logging.getLogger("auth")
@@ -72,17 +73,11 @@ def security_warnings() -> list[str]:
     """
     reasons: list[str] = []
     if not auth_enabled():
-        reasons.append(
-            "auth.method: none — le API rispondono a chiunque raggiunga questo "
-            "indirizzo, senza login (lettura e scrittura di config, dispositivi, Docker)")
+        reasons.append(t("sicurezza.authNone"))
     elif settings.auth.bypass_lan:
-        reasons.append(
-            "auth.bypass_lan: true — il login e' saltato per ogni IP privato: "
-            "la 'LAN' comprende anche subnet segmentate e client VPN")
+        reasons.append(t("sicurezza.bypassLan"))
     if auth_enabled() and not password_set():
-        reasons.append(
-            "nessuna password admin impostata: il primo che apre la dashboard "
-            "puo' sceglierla (Impostazioni -> Password admin)")
+        reasons.append(t("sicurezza.nessunaPassword"))
     return reasons
 
 
@@ -173,9 +168,9 @@ def require_session(request: Request) -> None:
     if not password_set():
         raise HTTPException(
             status_code=503,
-            detail="serve una password admin: impostala in Impostazioni -> Password admin")
+            detail=t("err.servePasswordAdmin"))
     if not session_valid(request.cookies):
-        raise HTTPException(status_code=401, detail="sessione richiesta")
+        raise HTTPException(status_code=401, detail=t("err.sessioneRichiesta"))
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -188,13 +183,19 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # auth disabilitata (difesa in profondita' per il servizio "no-auth").
         if (request.method in _MUTATING and path.startswith("/api/")
                 and not same_origin(request)):
-            return JSONResponse({"detail": "origine non consentita"}, status_code=403)
+            return JSONResponse({"detail": t("err.origineNonConsentita")}, status_code=403)
+        # `/api/setup/` resta fuori dall'auth perche' il primo avvio avviene
+        # quando una password admin non esiste ancora — stessa finestra in cui
+        # `/api/auth/password` accetta il bootstrap. E' sicuro solo perche' quel
+        # router si spegne da solo (404) appena config.yaml esiste, e non puo'
+        # sovrascrivere una configurazione gia' presente.
         if (request.method == "OPTIONS"
                 or not auth_enabled()
                 or not path.startswith("/api/")
                 or path.startswith("/api/auth/")
+                or path == "/api/setup" or path.startswith("/api/setup/")
                 or path == "/health"):
             return await call_next(request)
         if is_authenticated(request):
             return await call_next(request)
-        return JSONResponse({"detail": "non autenticato"}, status_code=401)
+        return JSONResponse({"detail": t("err.nonAutenticato")}, status_code=401)

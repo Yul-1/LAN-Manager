@@ -104,6 +104,17 @@ class DockerConfig(BaseModel):
     _v_hosts = field_validator("hosts", mode="before")(_none_to_list)
 
 
+class UIConfig(BaseModel):
+    """Preferenze dell'interfaccia che valgono per tutti i browser.
+
+    La lingua qui e' il DEFAULT del servizio, non un obbligo: chi la sceglie
+    dalla dashboard vince, e la sua scelta resta nel suo browser. Serve a chi
+    installa per un'altra persona — o per se' su piu' dispositivi — senza
+    doverla reimpostare ovunque.
+    """
+    default_language: str = ""      # "" = lingua del browser, poi inglese
+
+
 class WireGuardConfig(BaseModel):
     interface: str = "wg0"
     config_file: str = ""
@@ -509,6 +520,7 @@ class Settings(BaseSettings):
     # Sotto-config
     router: RouterConfig = RouterConfig()
     docker: DockerConfig = DockerConfig()
+    ui: UIConfig = UIConfig()
     wireguard: WireGuardConfig = WireGuardConfig()
     auth: AuthConfig = AuthConfig()
     discovery: DiscoveryConfig = DiscoveryConfig()

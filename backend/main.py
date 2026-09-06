@@ -28,9 +28,10 @@ from config import settings
 from middleware.auth import (AuthMiddleware, COOKIE, auth_enabled, is_lan, same_origin,
                              security_warnings, valid_token)
 from routers import (alerts, auth, config_api, devices, docker_svc, history, host, logs,
-                     services, system, terminal, tools, wan, wireguard)
+                     services, setup, system, terminal, tools, wan, wireguard)
 from services.collector import get_collector
 from services.errors import exc_text
+from services.i18n import imposta_lingua
 from services.log_buffer import install as install_log_buffer
 
 logging.basicConfig(
@@ -165,6 +166,17 @@ async def errore_validazione(request: Request, exc: RequestValidationError):
 # CORS cosi' CORS resta lo strato piu' esterno (preflight gestito per primo).
 app.add_middleware(AuthMiddleware)
 
+
+@app.middleware("http")
+async def lingua_richiesta(request: Request, call_next):
+    """Imposta la lingua della richiesta da Accept-Language.
+
+    Va prima di tutto il resto: anche il rifiuto dell'auth e' un messaggio che
+    l'utente legge, e senza questo uscirebbe sempre in inglese.
+    """
+    imposta_lingua(request.headers.get("accept-language"))
+    return await call_next(request)
+
 # CORS: montato solo se sono state dichiarate origini esterne. Di norma la lista
 # e' vuota — l'unico client e' la SPA servita dallo stesso host, e una richiesta
 # same-origin non passa da CORS — quindi non si risponde con nessun header CORS
@@ -190,6 +202,8 @@ app.include_router(wan.router,        prefix="/api/wan",       tags=["wan"])
 app.include_router(logs.router,       prefix="/api/logs",      tags=["logs"])
 app.include_router(config_api.router, prefix="/api/config",    tags=["config"])
 app.include_router(auth.router,       prefix="/api/auth",      tags=["auth"])
+# Primo avvio: le rotte si spengono da sole appena config.yaml esiste.
+app.include_router(setup.router,      prefix="/api/setup",     tags=["setup"])
 app.include_router(host.router,       prefix="/api/host",      tags=["host"])
 app.include_router(history.router,    prefix="/api/history",   tags=["history"])
 app.include_router(tools.router,      prefix="/api/tools",     tags=["tools"])
