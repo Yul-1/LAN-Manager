@@ -1,7 +1,5 @@
 # LAN-Manager
 
-[![CI](https://github.com/Yul-1/LAN-Manager/actions/workflows/ci.yml/badge.svg)](https://github.com/Yul-1/LAN-Manager/actions/workflows/ci.yml)
-
 [English](README.md) · **Italiano**
 
 Dashboard self-hosted per **gestire, monitorare e mappare** la LAN di casa o di un
