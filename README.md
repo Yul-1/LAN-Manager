@@ -67,13 +67,7 @@ cd LAN-Manager
 docker compose up --build
 ```
 
-That builds the images locally, which takes a couple of minutes. To use the
-prebuilt ones instead — published for `linux/amd64` on every release — replace
-the last line with:
-
-```sh
-docker compose pull && docker compose up -d
-```
+The images are built locally, which takes a couple of minutes the first time.
 
 The dashboard is then on port 80 of the host, and it walks you through the rest:
 it proposes the networks to monitor by reading this machine's interfaces, asks

@@ -70,13 +70,8 @@ cd LAN-Manager
 docker compose up --build
 ```
 
-Questo costruisce le immagini in locale, e ci vogliono un paio di minuti. Per
-usare invece quelle gia' pronte — pubblicate per `linux/amd64` ad ogni
-rilascio — al posto dell'ultima riga:
-
-```sh
-docker compose pull && docker compose up -d
-```
+Le immagini si costruiscono in locale: la prima volta ci vogliono un paio di
+minuti.
 
 La dashboard e' poi sulla porta 80 dell'host, e ti guida lei per il resto:
 propone le reti da monitorare leggendo le interfacce di questa macchina, chiede
