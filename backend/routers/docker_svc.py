@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import re
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 
+from middleware.auth import require_session
+from services.audit import audit
 from services.docker_client import get_docker_manager
 
 router = APIRouter()
@@ -40,10 +42,18 @@ async def list_hosts():
 
 
 @router.post("/containers/{container_id}/action")
-async def container_action(container_id: str, req: ActionRequest):
-    """Azione su un container del dato host (start/stop/restart/pause/unpause)."""
+async def container_action(container_id: str, req: ActionRequest, request: Request,
+                           _: None = Depends(require_session)):
+    """Azione su un container del dato host (start/stop/restart/pause/unpause).
+
+    Sessione sempre richiesta, come il riavvio: fermare un container su un host
+    della rete non e' come guardarne lo stato, e con `bypass_lan` o
+    `method: none` lo avrebbe potuto fare chiunque in LAN.
+    """
     if not _CID_RE.match(container_id):
         raise HTTPException(status_code=400, detail="container_id non valido")
+    audit("docker.azione", ip=(request.client.host if request.client else "unknown"),
+          host=req.host, container=container_id, azione=req.action)
     try:
         ok = await get_docker_manager().container_action(req.host, container_id, req.action)
     except ValueError as e:

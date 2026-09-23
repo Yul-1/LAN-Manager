@@ -217,6 +217,28 @@ def test_con_la_sessione_il_segreto_si_salva(auth_client, segreti_su_file_tempor
     assert "LAN_ROUTER__PASSWORD" in segreti_su_file_temporaneo.read_text()
 
 
+# ── Azioni sull'infrastruttura: sessione sempre ────────────────────
+
+AZIONI = [
+    ("/api/docker/containers/abc123/action", {"action": "stop", "host": "local"}),
+    ("/api/wireguard/reload", None),
+]
+
+
+@pytest.mark.parametrize("rotta,corpo", AZIONI)
+def test_le_azioni_esigono_la_sessione_col_bypass_lan(lan_client, monkeypatch, rotta, corpo):
+    monkeypatch.setattr(settings.auth, "bypass_lan", True)
+    r = lan_client.post(rotta, **({"json": corpo} if corpo else {}))
+    assert r.status_code == 401
+
+
+@pytest.mark.parametrize("rotta,corpo", AZIONI)
+def test_le_azioni_esigono_la_sessione_ad_auth_spenta(client, monkeypatch, rotta, corpo):
+    monkeypatch.setattr(settings.auth, "method", "none")
+    r = client.post(rotta, **({"json": corpo} if corpo else {}))
+    assert r.status_code == 401
+
+
 # ── Catalogo servizi: SSH solo verso host configurati ──────────────
 
 @pytest.mark.parametrize("corpo", [
