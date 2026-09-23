@@ -61,14 +61,25 @@ async def login(body: LoginBody, response: Response, request: Request):
         raise HTTPException(status_code=401, detail=t("err.credenziali"))
     _login_rl.reset(ip)
     response.set_cookie(COOKIE, make_token(settings.auth.username),
-                        httponly=True, samesite="lax", max_age=TTL)
+                        httponly=True, samesite="lax", max_age=TTL,
+                        secure=_https(request))
     return {"ok": True}
 
 
 @router.post("/logout")
-async def logout(response: Response):
-    response.delete_cookie(COOKIE)
+async def logout(response: Response, request: Request):
+    response.delete_cookie(COOKIE, httponly=True, samesite="lax", secure=_https(request))
     return {"ok": True}
+
+
+def _https(request: Request) -> bool:
+    """Il client e' in HTTPS? Dietro nginx lo dice `X-Forwarded-Proto`, che
+    uvicorn (`--proxy-headers`) riporta nello schema della richiesta.
+
+    Il cookie di sessione prende `Secure` solo in quel caso: su HTTPS non deve
+    mai viaggiare in chiaro, ma forzarlo sempre renderebbe impossibile il login
+    nei deploy in HTTP puro, che in LAN sono la norma."""
+    return request.url.scheme == "https"
 
 
 @router.post("/password")

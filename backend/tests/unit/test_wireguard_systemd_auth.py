@@ -253,6 +253,14 @@ def test_un_cidr_non_valido_in_bypass_networks_e_rifiutato():
         AuthConfig(bypass_networks=["192.0.2.0/33"])
 
 
+def test_cors_rifiuta_il_jolly():
+    # Con le credenziali ammesse, "*" aprirebbe le API a qualsiasi sito.
+    from config import CorsConfig
+    with pytest.raises(ValueError, match="non e' ammesso"):
+        CorsConfig(allowed_origins=["http://192.0.2.5:3000", "*"])
+    assert CorsConfig(allowed_origins=["http://192.0.2.5:3000"]).allowed_origins
+
+
 # ── security_warnings ──────────────────────────────────────────────
 
 def test_una_configurazione_chiusa_non_produce_avvisi():

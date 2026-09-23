@@ -143,3 +143,33 @@ def test_il_websocket_del_terminale_richiede_la_sessione(client):
     with pytest.raises(Exception):
         with client.websocket_connect("/ws/terminal"):
             pass
+
+
+# ── Cookie di sessione: Secure quando il client e' in HTTPS ─────────
+
+def _set_cookie(risposta) -> str:
+    return next(v for k, v in risposta.headers.items()
+                if k.lower() == "set-cookie" and v.startswith(COOKIE))
+
+
+def test_in_https_il_cookie_di_sessione_e_secure(app):
+    # Dietro nginx lo schema arriva da X-Forwarded-Proto (uvicorn --proxy-headers):
+    # qui lo fissa direttamente il base_url del client.
+    from fastapi.testclient import TestClient
+    r = _login(TestClient(app, base_url="https://testserver"))
+    assert r.status_code == 200
+    cookie = _set_cookie(r).lower()
+    assert "secure" in cookie and "httponly" in cookie
+
+
+def test_in_http_il_cookie_resta_utilizzabile(client):
+    # Forzare Secure in HTTP puro renderebbe impossibile il login.
+    r = _login(client)
+    assert r.status_code == 200
+    assert "secure" not in _set_cookie(r).lower()
+
+
+def test_il_logout_in_https_cancella_il_cookie_secure(app):
+    from fastapi.testclient import TestClient
+    r = TestClient(app, base_url="https://testserver").post("/api/auth/logout")
+    assert "secure" in _set_cookie(r).lower()

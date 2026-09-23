@@ -300,6 +300,17 @@ class CorsConfig(BaseModel):
 
     _v_origins = field_validator("allowed_origins", mode="before")(_none_to_list)
 
+    @field_validator("allowed_origins")
+    @classmethod
+    def _niente_jolly(cls, v: list[str]) -> list[str]:
+        # Con `allow_credentials=True` (main.py) Starlette risponde a "*"
+        # rimandando l'Origin di chiunque: qualsiasi sito aperto nel browser
+        # dell'admin chiamerebbe le API con la sua sessione.
+        if any(str(o).strip() == "*" for o in v):
+            raise ValueError("cors.allowed_origins: \"*\" non e' ammesso, elenca le "
+                             "origini una per una (es. \"http://altrohost:3000\")")
+        return v
+
 
 class TerminalConfig(BaseModel):
     """Terminale SSH dalla dashboard.
