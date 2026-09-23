@@ -217,6 +217,39 @@ def test_con_la_sessione_il_segreto_si_salva(auth_client, segreti_su_file_tempor
     assert "LAN_ROUTER__PASSWORD" in segreti_su_file_temporaneo.read_text()
 
 
+# ── Cambio password admin: sessione vera ───────────────────────────
+
+def test_col_bypass_lan_la_password_non_si_cambia_senza_sessione(
+        lan_client, monkeypatch, segreti_su_file_temporaneo):
+    monkeypatch.setattr(settings.auth, "bypass_lan", True)
+    r = lan_client.post("/api/auth/password", json={"password": "attaccante"})
+    assert r.status_code == 401
+    assert not segreti_su_file_temporaneo.exists()
+
+
+def test_ad_auth_spenta_la_password_non_si_cambia_senza_sessione(
+        client, monkeypatch, segreti_su_file_temporaneo):
+    monkeypatch.setattr(settings.auth, "method", "none")
+    r = client.post("/api/auth/password", json={"password": "attaccante"})
+    assert r.status_code == 401
+    assert not segreti_su_file_temporaneo.exists()
+
+
+def test_con_la_sessione_la_password_si_cambia(auth_client, segreti_su_file_temporaneo):
+    r = auth_client.post("/api/auth/password", json={"password": "nuova-password"})
+    assert r.status_code == 200
+    assert "LAN_AUTH__PASSWORD_HASH" in segreti_su_file_temporaneo.read_text()
+
+
+def test_senza_password_il_bootstrap_dalla_lan_resta_possibile(
+        lan_client, monkeypatch, segreti_su_file_temporaneo):
+    # Primo avvio: non esiste ancora una password con cui aprire una sessione.
+    monkeypatch.delenv("LAN_AUTH__PASSWORD_HASH", raising=False)
+    monkeypatch.setattr(settings.auth, "password_hash", "")
+    r = lan_client.post("/api/auth/password", json={"password": "prima-password"})
+    assert r.status_code == 200
+
+
 # ── Azioni sull'infrastruttura: sessione sempre ────────────────────
 
 AZIONI = [

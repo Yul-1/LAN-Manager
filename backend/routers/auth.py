@@ -75,10 +75,14 @@ async def logout(response: Response):
 async def set_password(body: PasswordBody, request: Request):
     """Imposta/cambia l'hash della password admin (scritto nei segreti).
 
-    Consentito se gia' autenticati, oppure in bootstrap (nessuna password
-    ancora impostata) da una richiesta proveniente dalla LAN."""
+    Consentito con una sessione vera, oppure in bootstrap (nessuna password
+    ancora impostata) da una richiesta proveniente dalla LAN.
+
+    Sessione e non `is_authenticated`: quella accetta anche `bypass_lan` e
+    `method: none`, e cosi' chiunque in LAN poteva sostituire la password
+    admin senza conoscerla — lo stesso takeover delle scritture di config."""
     bootstrap = (not password_set()) and request.client and is_lan(request.client.host)
-    if not is_authenticated(request) and not bootstrap:
+    if not session_valid(request.cookies) and not bootstrap:
         raise HTTPException(status_code=401, detail=t("err.nonAutorizzato"))
     if len(body.password) < 6:
         raise HTTPException(status_code=400, detail=t("err.passwordCorta", n=6))
