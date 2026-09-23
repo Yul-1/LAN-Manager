@@ -75,7 +75,8 @@ def security_warnings() -> list[str]:
     if not auth_enabled():
         reasons.append(t("sicurezza.authNone"))
     elif settings.auth.bypass_lan:
-        reasons.append(t("sicurezza.bypassLan"))
+        reti = ", ".join(str(r) for r in reti_fidate()) or "-"
+        reasons.append(t("sicurezza.bypassLan", reti=reti))
     if auth_enabled() and not password_set():
         reasons.append(t("sicurezza.nessunaPassword"))
     return reasons
@@ -130,6 +131,9 @@ def valid_token(token: str) -> bool:
 
 
 def is_lan(host: str | None) -> bool:
+    """Indirizzo privato o loopback. Troppo largo per decidere chi entra senza
+    login: resta solo per il primo avvio, quando una rete configurata con cui
+    fare di meglio ancora non esiste (vedi `in_rete_locale`)."""
     if not host:
         return False
     try:
@@ -139,11 +143,48 @@ def is_lan(host: str | None) -> bool:
     return ip.is_private or ip.is_loopback
 
 
+def reti_fidate() -> list:
+    """Reti per cui vale `bypass_lan`: `auth.bypass_networks`, altrimenti le
+    `subnets` configurate. Una subnet con CIDR illeggibile si salta con un
+    warning invece di far cadere ogni richiesta."""
+    cidrs = settings.auth.bypass_networks or [s.cidr for s in settings.subnets]
+    reti = []
+    for c in cidrs:
+        try:
+            reti.append(ipaddress.ip_network(str(c).strip(), strict=False))
+        except ValueError:
+            log.warning(f"rete non valida ignorata per il bypass: {c!r}")
+    return reti
+
+
+def is_trusted_network(host: str | None) -> bool:
+    """True se il client sta in una delle reti fidate (o e' il loopback).
+
+    Sostituisce `is_lan` per `bypass_lan`: "ogni IP privato" comprendeva
+    subnet segmentate, client VPN e CGNAT, cioe' reti che il proprietario non
+    ha mai dichiarato sue. Nessuna rete configurata = nessun bypass."""
+    if not host:
+        return False
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        return False
+    if ip.is_loopback:
+        return True
+    return any(ip.version == rete.version and ip in rete for rete in reti_fidate())
+
+
+def in_rete_locale(host: str | None) -> bool:
+    """Perimetro del bootstrap della password: le reti configurate se ce ne
+    sono, altrimenti (primo avvio) ogni indirizzo privato."""
+    return is_trusted_network(host) if reti_fidate() else is_lan(host)
+
+
 def is_authenticated(request: Request) -> bool:
     """True se la richiesta e' autorizzata (sessione valida o bypass LAN)."""
     if not auth_enabled():
         return True
-    if settings.auth.bypass_lan and request.client and is_lan(request.client.host):
+    if settings.auth.bypass_lan and request.client and is_trusted_network(request.client.host):
         return True
     return valid_token(request.cookies.get(COOKIE, ""))
 

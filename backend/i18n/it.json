@@ -29,6 +29,6 @@
   "err.sshTimeout": "timeout: l'host non ha completato la connessione SSH (porta 22 chiusa o filtrata da un firewall)",
   "stato.raccoltaInCorso": "raccolta lenta in corso",
   "sicurezza.authNone": "auth.method: none — le API rispondono a chiunque raggiunga questo indirizzo, senza login (lettura e scrittura di config, dispositivi, Docker)",
-  "sicurezza.bypassLan": "auth.bypass_lan: true — il login e' saltato per ogni IP privato: la 'LAN' comprende anche subnet segmentate e client VPN",
+  "sicurezza.bypassLan": "auth.bypass_lan: true — il login e' saltato per ogni client in {reti}: in auth.bypass_networks metti solo reti dove ogni dispositivo e' fidato (niente subnet VPN o ospiti)",
   "sicurezza.nessunaPassword": "nessuna password admin impostata: il primo che apre la dashboard puo' sceglierla (Impostazioni -> Password admin)"
 }

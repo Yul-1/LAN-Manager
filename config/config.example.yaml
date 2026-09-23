@@ -115,13 +115,17 @@ ui:
 #  secrets file (secrets.env), NEVER in clear text here.
 auth:
   method: "basic"            # none | basic
-  # Skip the login for requests coming from a private address. Note the
-  # scope: this trusts EVERY private range plus loopback, not just your own
-  # subnet - and a "LAN" includes segmented subnets, guest wifi and VPN
-  # clients. Keep it false if you have guests or untrusted devices;
+  # Skip the login for requests coming from the networks in bypass_networks
+  # (plus loopback). Keep it false if you have guests or untrusted devices;
   # MANDATORY false if the backend sits behind a reverse proxy (the address
-  # seen would be the proxy's).
+  # seen would be the proxy's). Even with the bypass on, changing the
+  # configuration, the password, containers and VPN always needs a login.
   bypass_lan: false
+  # Networks trusted by bypass_lan, as CIDR. Empty = every CIDR listed in
+  # `subnets`. List them explicitly to leave out the VPN and guest subnets:
+  # every device there would get in without a password.
+  bypass_networks: []
+  #   - "192.0.2.0/24"
   username: "admin"
   # password_hash: do NOT put it here -> set it from the UI (it goes to the secrets).
 

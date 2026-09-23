@@ -108,11 +108,37 @@ def test_il_bypass_lan_non_scatta_per_un_client_non_ip(client, monkeypatch):
     assert client.get("/api/devices/").status_code == 401
 
 
-def test_il_bypass_lan_apre_le_api_a_un_client_privato(lan_client, monkeypatch):
-    # Il motivo per cui resta spento in produzione: la "LAN" comprende subnet
-    # segmentate e client VPN, come ha dimostrato il pentest dalla Kali.
+def test_il_bypass_lan_apre_le_api_a_un_client_delle_reti_fidate(lan_client, monkeypatch):
     monkeypatch.setattr(settings.auth, "bypass_lan", True)
     assert lan_client.get("/api/devices/").status_code != 401
+
+
+def test_il_bypass_lan_non_vale_per_un_privato_fuori_dalle_reti_fidate(
+        client_rete_estranea, monkeypatch):
+    # Prima bastava un indirizzo privato qualsiasi: subnet segmentate e client
+    # VPN entravano senza login (pentest 2026-09-23, dalla subnet delle VM).
+    monkeypatch.setattr(settings.auth, "bypass_lan", True)
+    assert client_rete_estranea.get("/api/devices/").status_code == 401
+
+
+def test_senza_reti_esplicite_valgono_le_subnet_configurate(
+        client_rete_estranea, monkeypatch):
+    from config import SubnetConfig
+    monkeypatch.setattr(settings.auth, "bypass_lan", True)
+    monkeypatch.setattr(settings.auth, "bypass_networks", [])
+    monkeypatch.setattr(settings, "subnets", [SubnetConfig(cidr="198.51.100.0/24", label="t")])
+    assert client_rete_estranea.get("/api/devices/").status_code == 401
+    monkeypatch.setattr(settings, "subnets", [SubnetConfig(cidr="10.99.0.0/24", label="t")])
+    assert client_rete_estranea.get("/api/devices/").status_code != 401
+
+
+def test_il_bootstrap_della_password_resta_nelle_reti_configurate(
+        client_rete_estranea, monkeypatch, segreti_su_file_temporaneo):
+    monkeypatch.delenv("LAN_AUTH__PASSWORD_HASH", raising=False)
+    monkeypatch.setattr(settings.auth, "password_hash", "")
+    r = client_rete_estranea.post("/api/auth/password", json={"password": "prima-password"})
+    assert r.status_code == 401
+    assert not segreti_su_file_temporaneo.exists()
 
 
 # ── require_session: nessuna deroga ────────────────────────────────

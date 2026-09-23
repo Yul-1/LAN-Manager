@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from config import settings
 from middleware.auth import (
-    COOKIE, TTL, auth_enabled, hash_password, is_authenticated, is_lan,
+    COOKIE, TTL, auth_enabled, hash_password, in_rete_locale, is_authenticated,
     make_token, password_set, security_warnings, session_valid, verify_password,
 )
 from services.i18n import t
@@ -81,7 +81,7 @@ async def set_password(body: PasswordBody, request: Request):
     Sessione e non `is_authenticated`: quella accetta anche `bypass_lan` e
     `method: none`, e cosi' chiunque in LAN poteva sostituire la password
     admin senza conoscerla — lo stesso takeover delle scritture di config."""
-    bootstrap = (not password_set()) and request.client and is_lan(request.client.host)
+    bootstrap = (not password_set()) and request.client and in_rete_locale(request.client.host)
     if not session_valid(request.cookies) and not bootstrap:
         raise HTTPException(status_code=401, detail=t("err.nonAutorizzato"))
     if len(body.password) < 6:

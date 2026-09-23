@@ -29,6 +29,6 @@
   "err.sshTimeout": "timeout: the host did not complete the SSH connection (port 22 closed or filtered by a firewall)",
   "stato.raccoltaInCorso": "a slow collection is already running",
   "sicurezza.authNone": "auth.method: none - the API answers anyone who can reach this address, with no login (reading and writing configuration, devices, Docker)",
-  "sicurezza.bypassLan": "auth.bypass_lan: true - the login is skipped for every private address: a 'LAN' also includes segmented subnets and VPN clients",
+  "sicurezza.bypassLan": "auth.bypass_lan: true - the login is skipped for every client in {reti}: list in auth.bypass_networks only networks where every device is trusted (no VPN or guest subnets)",
   "sicurezza.nessunaPassword": "no admin password set: the first person to open the dashboard can choose it (Settings -> Admin password)"
 }

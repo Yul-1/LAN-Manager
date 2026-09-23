@@ -222,6 +222,37 @@ def test_riconoscimento_degli_indirizzi_privati(host, atteso):
     assert is_lan(host) is atteso
 
 
+# ── reti fidate per bypass_lan ─────────────────────────────────────
+
+@pytest.mark.parametrize("host,atteso", [
+    ("192.0.2.40", True),           # dentro la subnet configurata
+    ("127.0.0.1", True), ("::1", True),
+    ("192.0.3.40", False),          # privato/documentativo ma fuori
+    ("10.0.0.1", False), ("100.64.0.1", False),
+    ("fd00::1", False), ("testclient", False), ("", False), (None, False),
+])
+def test_solo_le_reti_configurate_sono_fidate(monkeypatch, host, atteso):
+    from config import settings as cfg
+    from middleware.auth import is_trusted_network
+    monkeypatch.setattr(cfg.auth, "bypass_networks", ["192.0.2.0/24"])
+    assert is_trusted_network(host) is atteso
+
+
+def test_senza_reti_non_ce_bypass_se_non_dal_loopback(monkeypatch):
+    from config import settings as cfg
+    from middleware.auth import is_trusted_network
+    monkeypatch.setattr(cfg.auth, "bypass_networks", [])
+    monkeypatch.setattr(cfg, "subnets", [])
+    assert is_trusted_network("192.168.1.10") is False
+    assert is_trusted_network("127.0.0.1") is True
+
+
+def test_un_cidr_non_valido_in_bypass_networks_e_rifiutato():
+    from config import AuthConfig
+    with pytest.raises(ValueError, match="CIDR non valido"):
+        AuthConfig(bypass_networks=["192.0.2.0/33"])
+
+
 # ── security_warnings ──────────────────────────────────────────────
 
 def test_una_configurazione_chiusa_non_produce_avvisi():

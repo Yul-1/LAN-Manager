@@ -213,10 +213,24 @@ class _ClientDaLan:
 
 
 @pytest.fixture
-def lan_client(app):
-    """Client che il middleware vede arrivare da un indirizzo privato vero."""
+def lan_client(app, monkeypatch):
+    """Client che il middleware vede arrivare da un indirizzo privato vero,
+    dentro le reti fidate (`auth.bypass_networks`): senza, `bypass_lan` non
+    scatterebbe e i test sulle deroghe passerebbero per il motivo sbagliato."""
     from fastapi.testclient import TestClient
+    from config import settings
+    monkeypatch.setattr(settings.auth, "bypass_networks", ["192.168.99.0/24"])
     return TestClient(_ClientDaLan(app), base_url="http://testserver")
+
+
+@pytest.fixture
+def client_rete_estranea(app, monkeypatch):
+    """Client da un indirizzo privato FUORI dalle reti fidate: una subnet
+    segmentata, o un client VPN."""
+    from fastapi.testclient import TestClient
+    from config import settings
+    monkeypatch.setattr(settings.auth, "bypass_networks", ["192.168.99.0/24"])
+    return TestClient(_ClientDaLan(app, ("10.99.0.7", 45000)), base_url="http://testserver")
 
 
 @pytest.fixture

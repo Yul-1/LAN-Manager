@@ -111,13 +111,17 @@ ui:
 #  segreti (secrets.env), MAI in chiaro qui.
 auth:
   method: "basic"            # none | basic
-  # Salta il login se la richiesta arriva da un indirizzo privato. Attenzione
-  # alla portata: si fida di OGNI spazio privato piu' il loopback, non solo
-  # della tua subnet — e una "LAN" comprende subnet segmentate, wifi ospiti e
-  # client VPN. Tienilo false se hai ospiti/dispositivi non fidati;
+  # Salta il login se la richiesta arriva dalle reti di bypass_networks (piu'
+  # il loopback). Tienilo false se hai ospiti/dispositivi non fidati;
   # OBBLIGATORIO false se il backend sta dietro un reverse proxy (l'IP visto
-  # sarebbe quello del proxy).
+  # sarebbe quello del proxy). Anche col bypass, modificare configurazione,
+  # password, container e VPN richiede sempre il login.
   bypass_lan: false
+  # Reti fidate per bypass_lan, in CIDR. Vuota = tutti i CIDR di `subnets`.
+  # Elencale a mano per lasciare fuori la subnet VPN e quella degli ospiti:
+  # ogni dispositivo li' entrerebbe senza password.
+  bypass_networks: []
+  #   - "192.0.2.0/24"
   username: "admin"
   # password_hash: NON metterlo qui -> impostalo dalla UI (finisce nei segreti).
 

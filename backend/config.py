@@ -11,6 +11,7 @@ Unica fonte di verita' della configurazione per tutto il backend.
 """
 from __future__ import annotations
 
+import ipaddress
 import os
 import re
 from pathlib import Path
@@ -145,12 +146,29 @@ class ToolsConfig(BaseModel):
 
 class AuthConfig(BaseModel):
     method: str = "basic"                    # none | basic
-    # Salta l'auth per QUALUNQUE indirizzo privato piu' il loopback (vedi
-    # is_lan in middleware/auth.py: ip.is_private or ip.is_loopback), non solo
-    # per la propria subnet. Il pentest 2026-08-17 e' partito da li'.
+    # Salta l'auth per i client dentro `bypass_networks` (piu' il loopback).
+    # Prima valeva per QUALUNQUE indirizzo privato: subnet segmentate e client
+    # VPN compresi (pentest 2026-08-17 e 2026-09-23).
     bypass_lan: bool = False
+    # CIDR per cui vale `bypass_lan`. Vuota = i CIDR di `subnets`. Va scritta a
+    # mano per lasciare fuori la subnet VPN o quella degli ospiti.
+    bypass_networks: list[str] = []
     username: str = "admin"
     password_hash: Optional[str] = None      # hash bcrypt (mai password in chiaro)
+
+    _v_bn = field_validator("bypass_networks", mode="before")(_none_to_list)
+
+    @field_validator("bypass_networks")
+    @classmethod
+    def _cidr_validi(cls, v: list[str]) -> list[str]:
+        # Un CIDR sbagliato qui allargherebbe o annullerebbe il perimetro senza
+        # dirlo: meglio rifiutare il salvataggio (o l'avvio) con il motivo.
+        for c in v:
+            try:
+                ipaddress.ip_network(str(c).strip(), strict=False)
+            except ValueError:
+                raise ValueError(f"auth.bypass_networks: CIDR non valido: {c!r}")
+        return [str(c).strip() for c in v]
 
 
 # ── Discovery (sorgenti pluggabili per scoprire piu' roba possibile) ─

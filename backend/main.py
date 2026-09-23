@@ -25,8 +25,8 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import settings
-from middleware.auth import (AuthMiddleware, COOKIE, auth_enabled, is_lan, same_origin,
-                             security_warnings, valid_token)
+from middleware.auth import (AuthMiddleware, COOKIE, auth_enabled, is_trusted_network,
+                             same_origin, security_warnings, valid_token)
 from routers import (alerts, auth, config_api, devices, docker_svc, history, host, logs,
                      services, setup, system, terminal, tools, wan, wireguard)
 from services.collector import get_collector
@@ -256,7 +256,8 @@ async def websocket_endpoint(ws: WebSocket):
     # Se l'auth e' attiva, lo stream live richiede una sessione valida
     # (o bypass LAN): chiude prima di accettare se non autorizzato.
     if auth_enabled():
-        client_ok = settings.auth.bypass_lan and ws.client and is_lan(ws.client.host)
+        client_ok = (settings.auth.bypass_lan and ws.client
+                     and is_trusted_network(ws.client.host))
         if not client_ok and not valid_token(ws.cookies.get(COOKIE, "")):
             await ws.close(code=1008, reason="sessione")
             return
