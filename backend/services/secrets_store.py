@@ -80,11 +80,18 @@ class SecretsStore:
         values: {id: nuovo_valore}. Un valore vuoto/assente lascia invariato;
         il valore "__CLEAR__" rimuove il segreto. Ritorna lo stato aggiornato.
         """
+        # Un id sconosciuto era ignorato con un 200 `changed: []`: chi usava il
+        # nome della variabile d'ambiente al posto dell'id credeva di aver
+        # salvato. Si rifiuta tutto prima di scrivere, cosi' non resta a meta'.
+        sconosciuti = sorted(k for k in values if k not in _BY_ID)
+        if sconosciuti:
+            raise ValueError(f"segreti sconosciuti: {', '.join(sconosciuti)} "
+                             f"(ammessi: {', '.join(_BY_ID)})")
         current = self._read()
         changed = []
         for fid, val in values.items():
-            field = _BY_ID.get(fid)
-            if field is None or val is None:
+            field = _BY_ID[fid]
+            if val is None:
                 continue
             env = field["env"]
             if val == "__CLEAR__":

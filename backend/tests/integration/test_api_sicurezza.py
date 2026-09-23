@@ -156,6 +156,67 @@ def test_con_la_sessione_le_rotte_sensibili_rispondono(auth_client):
     assert auth_client.get("/api/terminal/hosts").status_code == 200
 
 
+# ── Scritture della configurazione: sessione sempre ────────────────
+#  Pentest 2026-09-23: con `bypass_lan` un client LAN senza login riscriveva
+#  l'hash della password admin da PUT /api/config/secrets.
+
+SCRITTURE_CONFIG = [
+    ("put", "/api/config/", {"yaml": "subnets: []\n"}),
+    ("put", "/api/config/section/subnets", {"value": []}),
+    ("put", "/api/config/secrets", {"values": {"admin_password_hash": "$2b$12$x"}}),
+    ("post", "/api/config/backups/config.20260101-000000.bak.yaml/restore", None),
+]
+
+
+@pytest.fixture
+def segreti_su_file_temporaneo(tmp_path, monkeypatch):
+    percorso = tmp_path / "secrets.env"
+    monkeypatch.setenv("LAN_ENV_FILE", str(percorso))
+    return percorso
+
+
+@pytest.mark.parametrize("metodo,rotta,corpo", SCRITTURE_CONFIG)
+def test_le_scritture_config_esigono_la_sessione_col_bypass_lan(
+        lan_client, monkeypatch, segreti_su_file_temporaneo, metodo, rotta, corpo):
+    monkeypatch.setattr(settings.auth, "bypass_lan", True)
+    r = getattr(lan_client, metodo)(rotta, **({"json": corpo} if corpo else {}))
+    assert r.status_code == 401
+    assert not segreti_su_file_temporaneo.exists()
+
+
+@pytest.mark.parametrize("metodo,rotta,corpo", SCRITTURE_CONFIG)
+def test_le_scritture_config_esigono_la_sessione_ad_auth_spenta(
+        client, monkeypatch, segreti_su_file_temporaneo, metodo, rotta, corpo):
+    monkeypatch.setattr(settings.auth, "method", "none")
+    r = getattr(client, metodo)(rotta, **({"json": corpo} if corpo else {}))
+    assert r.status_code == 401
+    assert not segreti_su_file_temporaneo.exists()
+
+
+def test_le_letture_config_restano_sotto_lauth_globale(lan_client, monkeypatch):
+    monkeypatch.setattr(settings.auth, "bypass_lan", True)
+    assert lan_client.get("/api/config/secrets").status_code == 200
+
+
+def test_un_segreto_sconosciuto_e_rifiutato_senza_scrivere(
+        auth_client, segreti_su_file_temporaneo):
+    # Il nome della variabile d'ambiente non e' l'id: prima rispondeva 200
+    # `changed: []` e chi chiamava credeva di aver salvato.
+    r = auth_client.put("/api/config/secrets",
+                        json={"values": {"LAN_AUTH__PASSWORD_HASH": "$2b$12$x",
+                                         "router_password": "p"}})
+    assert r.status_code == 400
+    assert "LAN_AUTH__PASSWORD_HASH" in r.json()["detail"]
+    assert not segreti_su_file_temporaneo.exists()
+
+
+def test_con_la_sessione_il_segreto_si_salva(auth_client, segreti_su_file_temporaneo):
+    r = auth_client.put("/api/config/secrets", json={"values": {"router_password": "p"}})
+    assert r.status_code == 200
+    assert r.json()["changed"] == ["router_password"]
+    assert "LAN_ROUTER__PASSWORD" in segreti_su_file_temporaneo.read_text()
+
+
 # ── CSRF ───────────────────────────────────────────────────────────
 
 def test_una_origine_estranea_sulle_scritture_e_respinta(auth_client, origine_estranea):

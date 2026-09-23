@@ -39,8 +39,15 @@ async def read_config():
     }
 
 
+# ── Scritture ──────────────────────────────────────────────────────
+#  Tutte con `require_session`, come il riavvio: da qui si cambiano l'hash della
+#  password admin, `auth.*` e gli host SSH, cioe' le chiavi del servizio. Con la
+#  sola auth globale, `bypass_lan` o `method: none` lasciavano riscriverle a un
+#  client LAN senza login (pentest 2026-09-23, takeover dell'account admin).
+
+
 @router.put("/")
-async def write_config(body: ConfigBody):
+async def write_config(body: ConfigBody, _: None = Depends(require_session)):
     """Valida e salva la configurazione (backup automatico). Richiede riavvio."""
     try:
         return await asyncio.to_thread(get_config_store().save_yaml, body.yaml)
@@ -59,7 +66,8 @@ async def read_section(name: str):
 
 
 @router.put("/section/{name}")
-async def write_section(name: str, body: SectionBody):
+async def write_section(name: str, body: SectionBody,
+                        _: None = Depends(require_session)):
     """Salva una sezione (validata, con backup). Richiede riavvio per applicare."""
     try:
         return await asyncio.to_thread(get_config_store().save_section, name, body.value)
@@ -76,9 +84,12 @@ async def secrets_status():
 
 
 @router.put("/secrets")
-async def update_secrets(body: SecretsBody):
+async def update_secrets(body: SecretsBody, _: None = Depends(require_session)):
     """Imposta/aggiorna i segreti nel file secrets.env (permessi 600)."""
-    return await asyncio.to_thread(get_secrets_store().update, body.values)
+    try:
+        return await asyncio.to_thread(get_secrets_store().update, body.values)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/backups")
@@ -88,7 +99,7 @@ async def list_backups():
 
 
 @router.post("/backups/{name}/restore")
-async def restore_backup(name: str):
+async def restore_backup(name: str, _: None = Depends(require_session)):
     """Ripristina un backup (crea comunque un backup dello stato attuale)."""
     try:
         return await asyncio.to_thread(get_config_store().restore_backup, name)
