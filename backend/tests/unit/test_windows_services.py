@@ -253,11 +253,13 @@ def test_il_router_pretende_l_host_e_rifiuta_i_jolly():
         _entry_for_kind(ServiceEntry(kind="windows_service", name="Spool*",
                                      host="192.0.2.12"))
 
+    # 192.0.2.1 e' il router della config di test: l'host deve essere fra
+    # quelli SSH configurati, altrimenti la voce e' rifiutata.
     e = _entry_for_kind(ServiceEntry(kind="windows_service", name=" Spooler ",
-                                     label="Coda di stampa", host=" 192.0.2.12 ",
+                                     label="Coda di stampa", host=" 192.0.2.1 ",
                                      critical=True))
     assert e == {"name": "Spooler", "label": "Coda di stampa", "critical": True,
-                 "host": "192.0.2.12", "dashboard": True}
+                 "host": "192.0.2.1", "dashboard": True}
 
 
 def test_il_catalogo_conosce_la_sezione_windows(tmp_path):

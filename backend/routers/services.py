@@ -10,6 +10,7 @@ from services.collector import get_collector
 from services.ratelimit import RateLimiter
 from services.service_store import get_service_store
 from services.services_overview import build_services_overview
+from services.terminal import is_allowed
 from services.windows_services import valida_nome
 
 router = APIRouter()
@@ -63,12 +64,27 @@ class ServiceEntry(BaseModel):
     dashboard: bool = True
 
 
+def _host_ssh_consentito(host: str) -> str:
+    """systemd e servizi Windows si leggono via SSH con le credenziali del
+    servizio: l'host deve essere uno di quelli gia' configurati (la stessa
+    allowlist del terminale). Senza, chi aggiunge un servizio faceva aprire al
+    collector una connessione SSH verso un indirizzo qualsiasi a ogni giro."""
+    host = host.strip()
+    if host and not is_allowed(host):
+        raise HTTPException(
+            status_code=400,
+            detail=(f"host {host} non configurato per SSH: aggiungilo prima "
+                    "agli host SSH (Terminale o Impostazioni)"))
+    return host
+
+
 def _entry_for_kind(b: ServiceEntry) -> dict:
     """Costruisce l'entry da salvare in base al metodo scelto."""
     if b.kind == "docker":
         e = {"name": b.name, "label": b.label, "url": b.url}
     elif b.kind == "systemd":
-        e = {"unit": b.unit, "label": b.label, "critical": b.critical, "host": b.host}
+        e = {"unit": b.unit, "label": b.label, "critical": b.critical,
+             "host": _host_ssh_consentito(b.host)}
     elif b.kind == "windows_service":
         # L'host non e' facoltativo come per systemd: l'host di default sarebbe
         # la macchina Linux del backend, dove un servizio Windows non esiste.
@@ -81,7 +97,7 @@ def _entry_for_kind(b: ServiceEntry) -> dict:
         except ValueError as err:
             raise HTTPException(status_code=400, detail=str(err))
         e = {"name": nome, "label": b.label, "critical": b.critical,
-             "host": b.host.strip()}
+             "host": _host_ssh_consentito(b.host)}
     elif b.kind == "http":
         e = {"name": b.name, "type": b.type}
         if b.type == "http":

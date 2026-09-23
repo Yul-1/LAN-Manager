@@ -113,7 +113,9 @@ def test_un_servizio_windows_scelto():
 @pytest.mark.parametrize("body", [
     ServiceEntry(kind="docker", name="portainer", dashboard=False),
     ServiceEntry(kind="systemd", unit="cron.service", dashboard=False),
-    ServiceEntry(kind="windows_service", name="Spooler", host="192.0.2.12", dashboard=False),
+    # Host del router della config di test: un servizio Windows si accetta solo
+    # su un host SSH gia' configurato.
+    ServiceEntry(kind="windows_service", name="Spooler", host="192.0.2.1", dashboard=False),
     ServiceEntry(kind="http", name="LuCI", type="http", url="http://192.0.2.1", dashboard=False),
 ])
 def test_la_spunta_tolta_viene_persistita(body):

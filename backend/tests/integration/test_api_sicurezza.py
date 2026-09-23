@@ -217,6 +217,32 @@ def test_con_la_sessione_il_segreto_si_salva(auth_client, segreti_su_file_tempor
     assert "LAN_ROUTER__PASSWORD" in segreti_su_file_temporaneo.read_text()
 
 
+# ── Catalogo servizi: SSH solo verso host configurati ──────────────
+
+@pytest.mark.parametrize("corpo", [
+    {"kind": "systemd", "unit": "prova-ssh.service", "host": "203.0.113.66"},
+    {"kind": "windows_service", "name": "Spooler", "host": "203.0.113.66"},
+])
+def test_un_servizio_su_un_host_non_configurato_e_rifiutato(auth_client, corpo):
+    from services.service_store import get_service_store
+    r = auth_client.post("/api/services/config", json=corpo)
+    assert r.status_code == 400
+    assert "203.0.113.66" in r.json()["detail"]
+    assert "203.0.113.66" not in str(get_service_store().read())
+
+
+def test_un_servizio_su_un_host_configurato_si_salva(auth_client, monkeypatch):
+    from services.service_store import get_service_store
+    monkeypatch.setattr(settings.router, "host", "198.51.100.1")
+    r = auth_client.post("/api/services/config",
+                         json={"kind": "systemd", "unit": "prova-ssh.service",
+                               "host": "198.51.100.1"})
+    try:
+        assert r.status_code == 200
+    finally:
+        get_service_store().remove("systemd", "prova-ssh.service")
+
+
 # ── CSRF ───────────────────────────────────────────────────────────
 
 def test_una_origine_estranea_sulle_scritture_e_respinta(auth_client, origine_estranea):
