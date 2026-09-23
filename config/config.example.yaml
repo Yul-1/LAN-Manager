@@ -331,7 +331,7 @@ subnets:
     label: "Lab"
     color: "#5bd97f"
     scan: true
-  - cidr: "10.100.0.0/24"
+  - cidr: "203.0.113.0/24"
     label: "WireGuard"
     color: "#e6a94d"
     scan: false        # VPN network: normally not scanned with nmap
