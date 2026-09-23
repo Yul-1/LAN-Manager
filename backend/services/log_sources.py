@@ -384,6 +384,15 @@ async def _leggi_journal(host_id: str, lines: int, filtro: str,
     import asyncssh
     from services.ssh_hosts import resolve_ssh_target
 
+    # Solo gli host che la pagina offre (quelli della configurazione). Senza
+    # questo controllo `journal:<qualunque IP>` apriva una connessione SSH con
+    # la chiave e l'utente di default verso un host scelto dal client, e il
+    # messaggio d'errore ne rivelava utente e raggiungibilita'. Il rifiuto
+    # avviene prima di ogni connessione e non dice niente dell'host chiesto.
+    if host_id and host_id not in {v["id"] for v in _host_journal()}:
+        log.warning(f"journal: host non consentito {host_id!r}")
+        return [], "host non consentito: il journal si legge solo dagli host configurati"
+
     kwargs = resolve_ssh_target(host_id)
     if not kwargs.get("host"):
         return [], ("nessun host indicato e nessun host systemd configurato: "

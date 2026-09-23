@@ -15,6 +15,7 @@ from datetime import datetime
 
 import pytest
 
+from config import settings
 from services import log_sources as LS
 
 
@@ -242,3 +243,39 @@ def test_una_riga_sul_confine_fra_archivio_e_buffer_non_esce_due_volte(monkeypat
     msg = [r["msg"] for r in out["lines"]]
     assert msg.count("sul confine") == 1, msg
     assert "prima" in msg, "il resto dell'archivio deve comunque uscire"
+
+
+# ── journal: solo host configurati ─────────────────────────────────
+
+class _ConnessioneVietata:
+    """Sostituto di asyncssh.connect: il test fallisce se viene chiamato."""
+    chiamate: list = []
+
+    def __call__(self, **kwargs):
+        self.chiamate.append(kwargs)
+        raise AssertionError(f"connessione SSH non attesa: {kwargs.get('host')}")
+
+
+def test_il_journal_di_un_host_non_configurato_non_apre_ssh(monkeypatch):
+    import asyncssh
+    vietata = _ConnessioneVietata()
+    vietata.chiamate = []
+    monkeypatch.setattr(asyncssh, "connect", vietata)
+    monkeypatch.setattr(settings.logs, "journal_hosts", ["198.51.100.10"])
+    righe, warning = asyncio.run(LS._leggi_journal("203.0.113.66", 5, "", None))
+    assert righe == []
+    assert vietata.chiamate == []
+    assert "non consentito" in warning
+    # Nessun dettaglio sull'host chiesto: ne' utente ne' esito della connessione.
+    assert "@" not in warning and "203.0.113.66" not in warning
+
+
+def test_il_journal_di_un_host_configurato_tenta_la_connessione(monkeypatch):
+    import asyncssh
+    vietata = _ConnessioneVietata()
+    vietata.chiamate = []
+    monkeypatch.setattr(asyncssh, "connect", vietata)
+    monkeypatch.setattr(settings.logs, "journal_hosts", ["198.51.100.10"])
+    righe, _ = asyncio.run(LS._leggi_journal("198.51.100.10", 5, "", None))
+    assert righe == []
+    assert [c["host"] for c in vietata.chiamate] == ["198.51.100.10"]
