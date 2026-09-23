@@ -48,6 +48,11 @@ RUN apt-get update \
 RUN groupadd --gid 1000 appuser \
     && useradd --uid 1000 --gid 1000 --create-home --shell /usr/sbin/nologin appuser
 
+# Cartella del socket del backend. Nello scenario generico ci si monta sopra un
+# volume con nome, che al primo uso eredita proprietario e permessi da qui:
+# senza, sarebbe di root e appuser non potrebbe creare il socket.
+RUN mkdir -p /run/lanmng && chown appuser:appuser /run/lanmng && chmod 0755 /run/lanmng
+
 WORKDIR /app
 
 # Prima le dipendenze (layer cache), poi il codice.
@@ -61,14 +66,21 @@ COPY VERSION /app/VERSION
 
 USER appuser
 
-EXPOSE 8000
+# Nessuna porta: il backend ascolta solo sul socket (vedi CMD).
 
-# Healthcheck senza dipendenze extra (curl non installato): usa la stdlib.
+# Healthcheck senza dipendenze extra (curl non installato): GET /health sul
+# socket con la sola stdlib, vedi backend/healthcheck.py.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
-    CMD python -c "import urllib.request,sys; sys.exit(0) if urllib.request.urlopen('http://127.0.0.1:8000/health').status==200 else sys.exit(1)" || exit 1
+    CMD python /app/backend/healthcheck.py || exit 1
 
-# Bind su loopback: l'unico ingresso dalla LAN e' nginx (host network).
-# --proxy-headers + forwarded-allow-ips: dietro l'nginx host (stesso host,
-# 127.0.0.1) il backend legge l'IP reale del client da X-Forwarded-For, cosi'
-# il controllo LAN dell'auth non vede sempre 127.0.0.1.
-CMD ["uvicorn", "main:app", "--app-dir", "/app/backend", "--host", "127.0.0.1", "--port", "8000", "--proxy-headers", "--forwarded-allow-ips", "127.0.0.1"]
+# Unix socket e non una porta su loopback: con network_mode host quella porta la
+# raggiunge qualunque processo dell'host, e ognuno poteva dichiarare l'IP client
+# che voleva con X-Forwarded-For (pentest 2026-09-23, F9). Il socket sta in una
+# cartella che raggiungono solo appuser e nginx (deploy/lanmng.tmpfiles.conf).
+#
+# --forwarded-allow-ips "*" e' obbligato: su unix socket uvicorn non conosce
+# l'indirizzo del proxy e con una lista di IP non applicherebbe mai gli header.
+# Il prezzo e' che con "*" uvicorn prende la voce piu' a SINISTRA di
+# X-Forwarded-For: nginx deve quindi impostarlo a $remote_addr e mai accodare
+# ($proxy_add_x_forwarded_for), altrimenti l'IP lo sceglie il client.
+CMD ["uvicorn", "main:app", "--app-dir", "/app/backend", "--uds", "/run/lanmng/backend.sock", "--proxy-headers", "--forwarded-allow-ips", "*"]

@@ -1,6 +1,6 @@
 # LANMng — reverse proxy LAN-only.
-# nginx gira in network_mode host: raggiunge il backend su 127.0.0.1:8000
-# (uvicorn e' in ascolto solo su loopback, non esposto direttamente in LAN).
+# Il backend non ha porte: nginx lo raggiunge sul unix socket nel volume
+# condiviso lanmng-run (/run/lanmng), che fuori dai due container vede solo root.
 #
 # E' un TEMPLATE: l'entrypoint dell'immagine nginx lo espande con envsubst in
 # /etc/nginx/conf.d/default.conf all'avvio. L'unica variabile sostituita e'
@@ -8,7 +8,7 @@
 # di nginx ($host, $http_upgrade...) restano intatte.
 
 upstream lanmng_backend {
-    server 127.0.0.1:8000;
+    server unix:/run/lanmng/backend.sock;
 }
 
 server {
@@ -50,7 +50,10 @@ server {
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # $remote_addr e non $proxy_add_x_forwarded_for: il backend (uvicorn su
+        # unix socket, --forwarded-allow-ips "*") prende la voce piu' a sinistra,
+        # e accodando a quella mandata dal client l'IP lo sceglierebbe lui.
+        proxy_set_header X-Forwarded-For $remote_addr;
         # Dice al backend se il client e' in HTTPS: da li' dipende il flag
         # Secure del cookie di sessione (routers/auth.py).
         proxy_set_header X-Forwarded-Proto $scheme;
@@ -65,7 +68,10 @@ server {
         # genera per i path senza slash finale altrimenti la perdono.
         proxy_set_header Host $http_host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # $remote_addr e non $proxy_add_x_forwarded_for: il backend (uvicorn su
+        # unix socket, --forwarded-allow-ips "*") prende la voce piu' a sinistra,
+        # e accodando a quella mandata dal client l'IP lo sceglierebbe lui.
+        proxy_set_header X-Forwarded-For $remote_addr;
         # Dice al backend se il client e' in HTTPS: da li' dipende il flag
         # Secure del cookie di sessione (routers/auth.py).
         proxy_set_header X-Forwarded-Proto $scheme;
