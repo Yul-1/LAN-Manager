@@ -12,6 +12,80 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-09-23
+
+Security release. Upgrading is recommended for every installation, and required
+reading for anyone who enabled `auth.bypass_lan` or `auth.method: none`.
+
+### Security
+- **Configuration and admin password could be changed without logging in.** With
+  `auth.bypass_lan: true` or `auth.method: none`, any client on the local network
+  could rewrite the configuration, the stored secrets and the admin password, and
+  take over the dashboard at the next restart. These changes now always require an
+  admin session. Setting the first password on a fresh install still works as before.
+- **Container and VPN actions now always require an admin session.** Starting or
+  stopping containers and reloading WireGuard were available to anyone the LAN
+  bypass let in. Each action is now also written to the audit log.
+- **The backend could be made to open SSH connections to arbitrary hosts.** The
+  `journal:<host>` log source and systemd or Windows services added to the catalog
+  accepted any address, and the backend connected to it with its own SSH credentials.
+  Only hosts already configured for SSH are accepted now; existing catalog entries
+  are left as they are.
+- **The LAN bypass trusted every private address.** Segmented subnets, guest
+  networks, VPN clients and carrier-grade NAT ranges all qualified. It now applies
+  only to the new `auth.bypass_networks` list, which defaults to your `subnets`.
+- **The session cookie is marked `Secure` when the dashboard is reached over
+  HTTPS.** Plain HTTP deployments keep working.
+- **`cors.allowed_origins: ["*"]` is rejected.** Combined with credentials it would
+  have let any website call the API with the admin's session.
+
+### Changed
+- `PUT /api/config/secrets` answers 400 for an unknown secret id instead of a
+  successful response that saved nothing.
+- The example WireGuard subnet is now a documentation range (`203.0.113.0/24`).
+
+### Upgrade notes
+- Using `auth.bypass_lan`? If your `subnets` include a VPN or guest network, list
+  only the trusted networks in `auth.bypass_networks`.
+- Running your own reverse proxy in front of the dashboard? Forward
+  `X-Forwarded-Proto` so the backend can mark the cookie `Secure`. The bundled nginx
+  configurations already do.
+
+### Sicurezza
+- **Configurazione e password admin si potevano cambiare senza login.** Con
+  `auth.bypass_lan: true` o `auth.method: none`, qualsiasi client della rete locale
+  poteva riscrivere la configurazione, i segreti salvati e la password admin, e
+  prendere il controllo della dashboard al riavvio successivo. Ora queste modifiche
+  richiedono sempre una sessione admin. Impostare la prima password su
+  un'installazione nuova funziona come prima.
+- **Le azioni su container e VPN richiedono sempre una sessione admin.** Avviare o
+  fermare container e ricaricare WireGuard era possibile per chiunque passasse dal
+  bypass LAN. Ogni azione ora finisce anche nel registro di audit.
+- **Il backend poteva essere indotto ad aprire connessioni SSH verso host
+  arbitrari.** La sorgente di log `journal:<host>` e i servizi systemd o Windows
+  aggiunti al catalogo accettavano qualsiasi indirizzo, e il backend vi si collegava
+  con le proprie credenziali SSH. Ora si accettano solo host gia' configurati per
+  SSH; le voci gia' presenti nel catalogo restano come sono.
+- **Il bypass LAN si fidava di ogni indirizzo privato.** Valevano anche subnet
+  segmentate, reti ospiti, client VPN e range CGNAT. Ora vale solo per il nuovo
+  elenco `auth.bypass_networks`, che di default coincide con le tue `subnets`.
+- **Il cookie di sessione e' marcato `Secure` quando si arriva alla dashboard in
+  HTTPS.** Le installazioni in HTTP semplice continuano a funzionare.
+- **`cors.allowed_origins: ["*"]` viene rifiutato.** Insieme alle credenziali avrebbe
+  permesso a qualsiasi sito di chiamare le API con la sessione dell'admin.
+
+### Modificato
+- `PUT /api/config/secrets` risponde 400 per un id di segreto sconosciuto, invece di
+  una risposta di successo che non salvava niente.
+- La subnet WireGuard d'esempio e' ora un range di documentazione (`203.0.113.0/24`).
+
+### Note di aggiornamento
+- Usi `auth.bypass_lan`? Se le tue `subnets` comprendono una rete VPN o ospiti, elenca
+  in `auth.bypass_networks` solo le reti fidate.
+- Hai un tuo reverse proxy davanti alla dashboard? Inoltra `X-Forwarded-Proto`,
+  cosi' il backend puo' marcare il cookie `Secure`. Le configurazioni nginx incluse
+  lo fanno gia'.
+
 ## [1.1.1] - 2026-09-06
 
 ### Fixed
@@ -125,7 +199,9 @@ Primo rilascio pubblico.
 - Repository initialized under the MIT License.
 - Repository inizializzato con licenza MIT.
 
-[Unreleased]: https://github.com/Yul-1/LAN-Manager/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/Yul-1/LAN-Manager/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/Yul-1/LAN-Manager/compare/v1.1.1...v1.1.2
+[1.1.1]: https://github.com/Yul-1/LAN-Manager/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/Yul-1/LAN-Manager/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/Yul-1/LAN-Manager/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/Yul-1/LAN-Manager/releases/tag/v0.1.0

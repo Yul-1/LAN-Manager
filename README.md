@@ -136,6 +136,13 @@ secret is set, never its value.
 - The SSH terminal and the network tools are sensitive surface: both require
   authentication and both are audited.
 
+### Security fixes
+
+- **1.1.2** — Fixed a vulnerability that allowed a client on the local network to
+  replace the admin password and change the configuration without logging in when
+  the LAN bypass was enabled, plus related hardening. Upgrading is recommended; see
+  the [CHANGELOG](CHANGELOG.md#112---2026-09-23).
+
 Found a security problem? Open an issue without a working exploit, or contact the
 maintainer privately.
 

@@ -139,6 +139,13 @@ se un segreto e' impostato, mai quale sia.
 - Il terminale SSH e gli strumenti di rete sono superficie sensibile: richiedono
   entrambi l'autenticazione e sono entrambi tracciati nel registro di audit.
 
+### Correzioni di sicurezza
+
+- **1.1.2** — Corretta una vulnerabilita' che consentiva a un client della rete
+  locale di sostituire la password admin e modificare la configurazione senza login
+  quando il bypass LAN era attivo, piu' altri rafforzamenti collegati. Si consiglia
+  l'aggiornamento; i dettagli sono nel [CHANGELOG](CHANGELOG.md#112---2026-09-23).
+
 Hai trovato un problema di sicurezza? Apri una issue senza allegare un exploit
 funzionante, oppure contatta il manutentore in privato.
 
