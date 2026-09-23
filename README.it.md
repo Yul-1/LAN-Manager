@@ -107,7 +107,9 @@ DOCKER_GID=123
 Se l'host ha gia' un suo nginx sulla porta 80, l'altra strada e' il profilo
 alternativo `deploy/docker-compose.host-nginx.yml`, che avvia il solo backend e
 lascia al tuo nginx il compito di servire il frontend — vedi i commenti in quel
-file.
+file. Il backend non ha porte TCP: il tuo nginx lo raggiunge sul unix socket
+`/run/lanmng/backend.sock`, la cui cartella la crea `deploy/lanmng.tmpfiles.conf`
+(da installare in `/etc/tmpfiles.d/`).
 
 ## Configurazione
 
@@ -141,6 +143,10 @@ se un segreto e' impostato, mai quale sia.
 
 ### Correzioni di sicurezza
 
+- **1.1.3** — Il backend non ascolta piu' su una porta TCP locale, che qualsiasi
+  processo dell'host poteva raggiungere per falsificare l'indirizzo del client. Chi
+  usa un nginx suo sull'host deve fare un passo di configurazione una volta sola;
+  i dettagli sono nel [CHANGELOG](CHANGELOG.md#113---2026-09-24).
 - **1.1.2** — Corretta una vulnerabilita' che consentiva a un client della rete
   locale di sostituire la password admin e modificare la configurazione senza login
   quando il bypass LAN era attivo, piu' altri rafforzamenti collegati. Si consiglia

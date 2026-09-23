@@ -12,6 +12,68 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-09-24
+
+Security release for the connection between nginx and the backend. It changes the
+deployment: read the upgrade notes before pulling the new image.
+
+### Security
+- **Any process on the host could reach the backend directly.** The backend listened
+  on `127.0.0.1:8000` in host network mode and trusted the client address sent in
+  `X-Forwarded-For`, so a local process could call the API and choose the address
+  used by the login rate limit, the audit log and the LAN bypass. The backend now
+  listens only on a unix socket, `/run/lanmng/backend.sock`, in a directory that
+  only the backend and nginx can open. Port 8000 is gone.
+
+### Changed
+- Both bundled nginx configurations set `X-Forwarded-For` to the client address
+  instead of appending to the value sent by the client.
+- The container healthcheck queries `/health` over the socket
+  (`backend/healthcheck.py`).
+
+### Upgrade notes
+- **Default setup (`docker-compose.yml`)**: nothing to do. The new `lanmng-run`
+  volume is created on `docker compose up`.
+- **Host that runs its own nginx (`deploy/docker-compose.host-nginx.yml`)**, before
+  starting the new image:
+  1. `sudo cp deploy/lanmng.tmpfiles.conf /etc/tmpfiles.d/lanmng.conf`, then
+     `sudo systemd-tmpfiles --create`. If your nginx does not run as `www-data`,
+     change the group in that file first.
+  2. Update your vhost from `deploy/lanmng.nginx.conf` (new `upstream` block on the
+     socket, `X-Forwarded-For $remote_addr`), then `nginx -t` and reload.
+  Without step 1 the compose refuses to start and says the directory is missing.
+- **Your own reverse proxy**: point it at `unix:/run/lanmng/backend.sock` and set
+  `X-Forwarded-For` to the client address. Do not append (`$proxy_add_x_forwarded_for`):
+  the backend trusts the first entry, so appending would let the client choose it.
+
+### Sicurezza
+- **Qualsiasi processo dell'host poteva raggiungere il backend direttamente.** Il
+  backend ascoltava su `127.0.0.1:8000` in network mode host e si fidava dell'indirizzo
+  client in `X-Forwarded-For`: un processo locale poteva chiamare l'API e scegliere
+  l'indirizzo usato dal limite ai tentativi di login, dal log di audit e dal bypass LAN.
+  Ora il backend ascolta solo su un unix socket, `/run/lanmng/backend.sock`, in una
+  cartella che possono aprire solo il backend e nginx. La porta 8000 non c'e' piu'.
+
+### Modificato
+- Entrambe le configurazioni nginx incluse impostano `X-Forwarded-For` all'indirizzo
+  del client invece di accodarlo al valore mandato dal client.
+- L'healthcheck del container interroga `/health` sul socket (`backend/healthcheck.py`).
+
+### Note di aggiornamento
+- **Installazione standard (`docker-compose.yml`)**: niente da fare. Il nuovo volume
+  `lanmng-run` si crea con `docker compose up`.
+- **Host con un nginx suo (`deploy/docker-compose.host-nginx.yml`)**, prima di avviare
+  la nuova immagine:
+  1. `sudo cp deploy/lanmng.tmpfiles.conf /etc/tmpfiles.d/lanmng.conf`, poi
+     `sudo systemd-tmpfiles --create`. Se il tuo nginx non gira come `www-data`,
+     cambia prima il gruppo in quel file.
+  2. Aggiorna il vhost da `deploy/lanmng.nginx.conf` (nuovo blocco `upstream` sul
+     socket, `X-Forwarded-For $remote_addr`), poi `nginx -t` e reload.
+  Senza il passo 1 il compose non parte e dice che la cartella manca.
+- **Reverse proxy tuo**: puntalo a `unix:/run/lanmng/backend.sock` e imposta
+  `X-Forwarded-For` all'indirizzo del client. Non accodare (`$proxy_add_x_forwarded_for`):
+  il backend si fida della prima voce, e accodando la sceglierebbe il client.
+
 ## [1.1.2] - 2026-09-23
 
 Security release. Upgrading is recommended for every installation, and required
