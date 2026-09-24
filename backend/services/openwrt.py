@@ -256,7 +256,10 @@ class RouterClient:
         Degrada a {} (con warning) se l'output e' vuoto o non e' JSON valido."""
         cmd = f"ubus call {obj} {method}"
         if params:
-            cmd += f" '{json.dumps(params)}'"
+            # shlex.quote e non '...': un apice nei parametri chiuderebbe la
+            # stringa e il resto finirebbe interpretato dalla shell del router
+            # (pentest 2026-09-24, G11).
+            cmd += f" {shlex.quote(json.dumps(params))}"
         stdout, stderr = await self.ssh.run(cmd)
         if not stdout.strip():
             if stderr.strip():
