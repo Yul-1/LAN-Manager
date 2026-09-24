@@ -6,10 +6,15 @@ cookie di sessione viaggiavano leggibili sulla LAN e sulla VPN (pentest
 2026-09-23, F8). Ora l'unico server che fa da proxy al backend e' quello su
 :443; :80 e :81 esistono solo per rimandare all'HTTPS.
 
-I test tengono ferme tre cose che una modifica distratta al vhost romperebbe
-senza errori visibili: nessuna via in chiaro verso il backend, il redirect che
-punta al nome servito (non a un altro), e `X-Forwarded-Proto` sul server TLS,
-da cui dipende il flag Secure del cookie (routers/auth.py).
+Dal 2026-09-24 lo stesso server risponde anche su :81 in TLS, per IP: un PC
+che non usa il DNS locale non risolveva il nome e, rimandato li' da :81,
+restava fuori dalla dashboard.
+
+I test tengono ferme le cose che una modifica distratta al vhost romperebbe
+senza errori visibili: nessuna via in chiaro verso il backend, :81 in TLS con
+il redirect dell'HTTP sulla stessa porta, il redirect di :80 verso il nome
+servito, e `X-Forwarded-Proto` sul server TLS, da cui dipende il flag Secure
+del cookie (routers/auth.py).
 """
 from __future__ import annotations
 
@@ -36,8 +41,16 @@ def _server_blocks(testo: str) -> list[str]:
     return blocchi
 
 
-def _porte(blocco: str) -> set[str]:
-    return {re.sub(r"^\[::\]:", "", p) for p in re.findall(r"^\s*listen\s+([^\s;]+)", blocco, re.M)}
+def _listen(blocco: str) -> list[tuple[str, bool]]:
+    """(porta, ssl) per ogni `listen` del blocco, IPv4 e IPv6 insieme."""
+    out = []
+    for porta, resto in re.findall(r"^\s*listen\s+([^\s;]+)([^;]*);", blocco, re.M):
+        out.append((re.sub(r"^\[::\]:", "", porta), "ssl" in resto.split()))
+    return out
+
+
+def _porte(blocco: str, ssl: bool) -> set[str]:
+    return {p for p, s in _listen(blocco) if s == ssl}
 
 
 def _nomi(blocco: str) -> list[str]:
@@ -45,15 +58,32 @@ def _nomi(blocco: str) -> list[str]:
 
 
 BLOCCHI = _server_blocks(VHOST.read_text())
-TLS = [b for b in BLOCCHI if "443" in _porte(b)]
-IN_CHIARO = [b for b in BLOCCHI if _porte(b) & {"80", "81"}]
+TLS = [b for b in BLOCCHI if _porte(b, ssl=True)]
+IN_CHIARO = [b for b in BLOCCHI if _porte(b, ssl=False)]
 
 
 def test_un_solo_server_tls_con_certificato():
     assert len(TLS) == 1
     (b,) = TLS
-    assert re.search(r"^\s*listen\s+443\s+ssl\b", b, re.M)
     assert "include /etc/nginx/snippets/lanmng-tls.conf;" in b
+
+
+def test_il_server_tls_ascolta_su_443_e_81_solo_in_tls():
+    (b,) = TLS
+    assert _porte(b, ssl=True) == {"443", "81"}
+    assert not _porte(b, ssl=False)
+    # Ogni porta sia in IPv4 sia in IPv6.
+    assert len(_listen(b)) == 4
+
+
+def test_http_in_chiaro_su_81_torna_in_https_sulla_stessa_porta():
+    (b,) = TLS
+    assert re.search(r"^\s*error_page\s+497\s+=301\s+https://\$host:\$server_port\$request_uri;",
+                     b, re.M)
+
+
+def test_nessuna_porta_81_in_chiaro():
+    assert all("81" not in _porte(b, ssl=False) for b in BLOCCHI)
 
 
 def test_il_server_tls_serve_tutta_la_dashboard():
@@ -69,17 +99,12 @@ def test_il_server_tls_dichiara_lo_schema_al_backend():
     assert valori == ["$scheme", "$scheme"]
 
 
-def test_80_e_81_rimandano_solo_all_https():
-    porte = set().union(*(_porte(b) for b in IN_CHIARO))
-    assert {"80", "81"} <= porte
-    for b in IN_CHIARO:
-        assert "proxy_pass" not in b and "root " not in b
-        assert re.search(r"^\s*return\s+301\s+https://", b, re.M), b
-
-
-def test_il_redirect_punta_al_nome_servito():
+def test_80_rimanda_solo_all_https_del_nome_servito():
     (nome_tls,) = _nomi(TLS[0])
+    assert IN_CHIARO
     for b in IN_CHIARO:
+        assert _porte(b, ssl=False) == {"80"}
+        assert "proxy_pass" not in b and "root " not in b
         assert _nomi(b) == [nome_tls]
-        destinazione = re.search(r"return\s+301\s+https://([^$/;]+)", b).group(1)
+        destinazione = re.search(r"^\s*return\s+301\s+https://([^$/;]+)", b, re.M).group(1)
         assert destinazione == nome_tls
