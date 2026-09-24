@@ -60,10 +60,14 @@ async def login(body: LoginBody, response: Response, request: Request):
         _login_rl.hit(ip)
         raise HTTPException(status_code=401, detail=t("err.credenziali"))
     _login_rl.reset(ip)
+    _set_session_cookie(response, request)
+    return {"ok": True}
+
+
+def _set_session_cookie(response: Response, request: Request) -> None:
     response.set_cookie(COOKIE, make_token(settings.auth.username),
                         httponly=True, samesite="lax", max_age=TTL,
                         secure=_https(request))
-    return {"ok": True}
 
 
 @router.post("/logout")
@@ -83,7 +87,7 @@ def _https(request: Request) -> bool:
 
 
 @router.post("/password")
-async def set_password(body: PasswordBody, request: Request):
+async def set_password(body: PasswordBody, request: Request, response: Response):
     """Imposta/cambia l'hash della password admin (scritto nei segreti).
 
     Consentito con una sessione vera, oppure in bootstrap (nessuna password
@@ -93,9 +97,14 @@ async def set_password(body: PasswordBody, request: Request):
     `method: none`, e cosi' chiunque in LAN poteva sostituire la password
     admin senza conoscerla — lo stesso takeover delle scritture di config."""
     bootstrap = (not password_set()) and request.client and in_rete_locale(request.client.host)
-    if not session_valid(request.cookies) and not bootstrap:
+    con_sessione = session_valid(request.cookies)
+    if not con_sessione and not bootstrap:
         raise HTTPException(status_code=401, detail=t("err.nonAutorizzato"))
     if len(body.password) < 6:
         raise HTTPException(status_code=400, detail=t("err.passwordCorta", n=6))
     get_secrets_store().update({"admin_password_hash": hash_password(body.password)})
+    # Il cambio invalida tutti i cookie, compreso quello di chi lo sta facendo:
+    # gliene diamo uno nuovo, firmato col nuovo hash, invece di buttarlo fuori.
+    if con_sessione:
+        _set_session_cookie(response, request)
     return {"ok": True, "restart_required": False}

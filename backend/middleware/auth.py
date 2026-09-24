@@ -121,7 +121,13 @@ def hash_password(password: str) -> str:
 # ── Token di sessione (HMAC) ───────────────────────────────────────
 
 def _sign(msg: str) -> str:
-    sig = hmac.new(settings.secret_key.encode(), msg.encode(), hashlib.sha256).digest()
+    # La firma copre anche l'hash corrente della password admin: cambiarla
+    # invalida ogni cookie gia' emesso. Prima un cookie rubato restava buono
+    # per 7 giorni anche dopo il cambio (pentest 2026-09-24, G9). L'hash non
+    # esce mai nel token: entra solo nel calcolo dell'HMAC. Il logout, invece,
+    # resta senza revoca lato server: il token e' senza stato.
+    payload = f"{msg}.{admin_hash()}"
+    sig = hmac.new(settings.secret_key.encode(), payload.encode(), hashlib.sha256).digest()
     return base64.urlsafe_b64encode(sig).decode().rstrip("=")
 
 

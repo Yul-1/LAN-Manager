@@ -172,6 +172,8 @@ def test_senza_password_admin_le_rotte_sensibili_rispondono_503(
     # require_session possa arrivare al suo 503.
     monkeypatch.delenv("LAN_AUTH__PASSWORD_HASH", raising=False)
     monkeypatch.setattr(settings.auth, "password_hash", "")
+    # La firma copre l'hash admin: il cookie va rifirmato dopo averlo tolto.
+    auth_client.cookies.set(COOKIE, make_token(settings.auth.username))
     r = auth_client.get(rotta)
     assert r.status_code == 503
     assert r.json()["detail"] == t("err.servePasswordAdmin", lingua="en")
@@ -236,7 +238,7 @@ def test_un_segreto_sconosciuto_e_rifiutato_senza_scrivere(
     assert not segreti_su_file_temporaneo.exists()
 
 
-def test_con_la_sessione_il_segreto_si_salva(auth_client, segreti_su_file_temporaneo):
+def test_con_la_sessione_il_segreto_si_salva(segreti_su_file_temporaneo, auth_client):
     r = auth_client.put("/api/config/secrets", json={"values": {"router_password": "p"}})
     assert r.status_code == 200
     assert r.json()["changed"] == ["router_password"]
@@ -261,10 +263,30 @@ def test_ad_auth_spenta_la_password_non_si_cambia_senza_sessione(
     assert not segreti_su_file_temporaneo.exists()
 
 
-def test_con_la_sessione_la_password_si_cambia(auth_client, segreti_su_file_temporaneo):
+def test_con_la_sessione_la_password_si_cambia(segreti_su_file_temporaneo, auth_client):
+    # Prima il file temporaneo, poi il client: il cookie di `auth_client` si
+    # firma con l'hash admin, e leggerlo crea il secrets store sul percorso
+    # corrente di LAN_ENV_FILE.
     r = auth_client.post("/api/auth/password", json={"password": "nuova-password"})
     assert r.status_code == 200
     assert "LAN_AUTH__PASSWORD_HASH" in segreti_su_file_temporaneo.read_text()
+
+
+def test_cambiare_la_password_revoca_i_cookie_esistenti(
+        segreti_su_file_temporaneo, client, monkeypatch):
+    # Pentest 2026-09-24 (G9): un cookie rubato restava valido per 7 giorni
+    # anche dopo il cambio password. Senza la variabile d'ambiente, che
+    # vincerebbe sul file, l'hash corrente e' quello scritto dal cambio.
+    from middleware.auth import valid_token
+    monkeypatch.delenv("LAN_AUTH__PASSWORD_HASH")
+    vecchio = make_token(settings.auth.username)
+    client.cookies.set(COOKIE, vecchio)
+    r = client.post("/api/auth/password", json={"password": "nuova-password"})
+    assert r.status_code == 200
+    nuovo = r.cookies.get(COOKIE)
+    assert nuovo and nuovo != vecchio, "chi cambia la password riceve un cookie nuovo"
+    assert valid_token(vecchio) is False
+    assert valid_token(nuovo) is True
 
 
 def test_senza_password_il_bootstrap_dalla_lan_resta_possibile(
