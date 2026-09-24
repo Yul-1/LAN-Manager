@@ -1,9 +1,8 @@
 """
 Controllo degli asset nello smoke post-deploy.
 
-Dal rilascio dell'i18n (2026-09-06) al 2026-09-24 i file della traduzione (i18n.js, i18n/*.js) non
-sono mai arrivati in /var/www/lanmng: l'elenco del rsync nel README li
-saltava. nginx rispondeva con index.html (fallback della SPA), il browser con
+Il 2026-09-24 i file della traduzione (i18n.js, i18n/*.js) mancavano da
+/var/www/lanmng: l'elenco del rsync nel README li saltava. nginx rispondeva con index.html (fallback della SPA), il browser con
 `nosniff` rifiutava lo script e la dashboard si fermava su "t is not defined".
 Lo smoke guardava solo il ?v= dell'index, quindi passava lo stesso.
 """
