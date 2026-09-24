@@ -298,6 +298,39 @@ def test_le_azioni_esigono_la_sessione_ad_auth_spenta(client, monkeypatch, rotta
     assert r.status_code == 401
 
 
+# ── Modifiche di dispositivi, servizi e alert: sessione sempre ─────
+#  Pentest 2026-09-24 (G1): coperte solo dal middleware, tornavano scrivibili
+#  senza login appena si riattivava `bypass_lan`. Le letture di stato restano
+#  aperte al bypass, che serve proprio a quello; il firewall del router no.
+
+MODIFICHE = [
+    ("post", "/api/devices/", {"ip": "192.0.2.50", "name": "x"}),
+    ("post", "/api/devices/scan", None),
+    ("put", "/api/devices/192.0.2.50", {"name": "x"}),
+    ("post", "/api/devices/192.0.2.50/hide", None),
+    ("post", "/api/devices/192.0.2.50/unhide", None),
+    ("delete", "/api/devices/192.0.2.50", None),
+    ("post", "/api/services/refresh", None),
+    ("post", "/api/services/config", {"kind": "http", "name": "x", "url": "http://192.0.2.9"}),
+    ("delete", "/api/services/config/http/x", None),
+    ("post", "/api/alerts/silence", {"rule": "x", "reason": "y"}),
+    ("get", "/api/wan/firewall", None),
+]
+
+
+@pytest.mark.parametrize("metodo,rotta,corpo", MODIFICHE)
+def test_le_modifiche_esigono_la_sessione_col_bypass_lan(lan_client, monkeypatch,
+                                                         metodo, rotta, corpo):
+    monkeypatch.setattr(settings.auth, "bypass_lan", True)
+    r = lan_client.request(metodo.upper(), rotta, **({"json": corpo} if corpo else {}))
+    assert r.status_code == 401
+
+
+def test_col_bypass_lan_le_letture_di_stato_restano_aperte(lan_client, monkeypatch):
+    monkeypatch.setattr(settings.auth, "bypass_lan", True)
+    assert lan_client.get("/api/devices/").status_code == 200
+
+
 # ── Catalogo servizi: SSH solo verso host configurati ──────────────
 
 @pytest.mark.parametrize("corpo", [

@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import re
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from config import settings
+from middleware.auth import require_session
 from services.openwrt import get_luci, get_ssh
 
 router = APIRouter()
@@ -56,7 +57,7 @@ async def ping_test(host: str = "", count: int = 4):
             "latency_ms": latency if online and latency else None}
 
 
-@router.get("/firewall")
+@router.get("/firewall", dependencies=[Depends(require_session)])
 async def firewall_rules():
     """Regole nftables correnti del router."""
     return {"rules": await get_ssh().get_nftables_rules()}

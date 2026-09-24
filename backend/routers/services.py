@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from middleware.auth import require_session
 from services.collector import get_collector
 from services.ratelimit import RateLimiter
 from services.service_store import get_service_store
@@ -26,7 +27,7 @@ async def services_overview():
     return await build_services_overview()
 
 
-@router.post("/refresh")
+@router.post("/refresh", dependencies=[Depends(require_session)])
 async def refresh_monitor():
     """Aggiorna subito servizi, container e risorse, senza attendere il ciclo.
 
@@ -128,7 +129,7 @@ async def services_config():
     return get_service_store().read()
 
 
-@router.post("/config")
+@router.post("/config", dependencies=[Depends(require_session)])
 async def add_service(body: ServiceEntry):
     """Aggiunge/aggiorna un servizio monitorato. Applicato al prossimo ciclo."""
     entry = _entry_for_kind(body)
@@ -139,7 +140,7 @@ async def add_service(body: ServiceEntry):
     return {"status": "added", "entry": entry}
 
 
-@router.delete("/config/{kind}/{ident}")
+@router.delete("/config/{kind}/{ident}", dependencies=[Depends(require_session)])
 async def remove_service(kind: str, ident: str):
     """Rimuove un servizio dal catalogo per identificativo (name/unit).
 

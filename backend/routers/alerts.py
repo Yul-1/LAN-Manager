@@ -8,9 +8,10 @@ from __future__ import annotations
 import asyncio
 import time
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
+from middleware.auth import require_session
 from services.alerts import CATALOGO, catalogo, live_alerts_config
 from services.config_store import get_config_store
 
@@ -34,7 +35,7 @@ async def alert_rules():
     }
 
 
-@router.post("/silence")
+@router.post("/silence", dependencies=[Depends(require_session)])
 async def silence_alert(body: SilenceBody):
     """Zittisce per sempre una regola (o un suo soggetto), con il motivo scritto.
 

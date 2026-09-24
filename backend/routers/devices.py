@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import asyncio
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 
+from middleware.auth import require_session
 from services.device_store import IDENTITY, get_device_store
 from services.openwrt import get_luci
 from services.ratelimit import RateLimiter
@@ -80,7 +81,7 @@ async def list_devices(subnet: str = "", status: str = "", include_hidden: bool 
     }
 
 
-@router.post("/")
+@router.post("/", dependencies=[Depends(require_session)])
 async def add_device(body: DeviceAdd):
     """Aggiunge un dispositivo manuale (MAC e/o IP). Compare anche se spento."""
     fields = {k: v for k, v in body.model_dump().items()
@@ -93,7 +94,7 @@ async def add_device(body: DeviceAdd):
     return {"status": "added", "entry": entry}
 
 
-@router.post("/scan")
+@router.post("/scan", dependencies=[Depends(require_session)])
 async def trigger_scan(background_tasks: BackgroundTasks):
     """Avvia un nuovo scan in background (con cooldown anti-abuso).
 
@@ -129,7 +130,7 @@ async def get_device(key: str):
     raise HTTPException(status_code=404, detail="dispositivo non trovato")
 
 
-@router.put("/{key}")
+@router.put("/{key}", dependencies=[Depends(require_session)])
 async def edit_device(key: str, body: DeviceEdit, background_tasks: BackgroundTasks):
     """Modifica i campi catalogo (indirizzi, nome/tipo/note/URL) di un dispositivo."""
     fields = {k: v for k, v in body.model_dump().items() if v is not None}
@@ -148,21 +149,21 @@ async def edit_device(key: str, body: DeviceEdit, background_tasks: BackgroundTa
             "updated": list(fields.keys())}
 
 
-@router.post("/{key}/hide")
+@router.post("/{key}/hide", dependencies=[Depends(require_session)])
 async def hide_device(key: str):
     """Nasconde un dispositivo (resta escluso anche se ri-scoperto)."""
     await _persist(lambda: get_device_store().hide(key))
     return {"status": "hidden", "key": key}
 
 
-@router.post("/{key}/unhide")
+@router.post("/{key}/unhide", dependencies=[Depends(require_session)])
 async def unhide_device(key: str):
     """Ripristina un dispositivo nascosto."""
     await _persist(lambda: get_device_store().unhide(key))
     return {"status": "visible", "key": key}
 
 
-@router.delete("/{key}")
+@router.delete("/{key}", dependencies=[Depends(require_session)])
 async def delete_device(key: str):
     """Rimuove l'entry dal catalogo e nasconde il dispositivo."""
     await _persist(lambda: get_device_store().delete(key))
