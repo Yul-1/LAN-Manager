@@ -7,7 +7,8 @@ piccolo ufficio. Gira in Docker, e' raggiungibile **solo dalla rete privata**, e
 pensata per essere configurata dalla sua stessa interfaccia web invece che
 modificando file.
 
-> **Versione 1.1.0** — interfaccia in italiano e inglese, e primo avvio guidato.
+> **Versione 1.2.1** — release di sicurezza: audit del terminale, strumenti di rete e
+> gestione delle sessioni piu' rigorosi. HTTPS con un nginx tuo dalla 1.2.0.
 > Vedi [CHANGELOG.md](CHANGELOG.md).
 
 ## Cosa fa

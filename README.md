@@ -6,7 +6,8 @@ Self-hosted dashboard to **manage, monitor and map your home or small-office LAN
 Runs in Docker, reachable **from your private network only**, and is meant to be
 configured from its own web UI rather than by editing files.
 
-> **Version 1.1.0** - English and Italian interface, and a guided first run.
+> **Version 1.2.1** - security release: stricter terminal audit, network tools and
+> session handling. HTTPS for setups with your own nginx since 1.2.0.
 > See [CHANGELOG.md](CHANGELOG.md).
 
 ## What it does
