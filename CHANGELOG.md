@@ -12,6 +12,73 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-24
+
+HTTPS for the setup that uses your own nginx. It changes the deployment: read the
+upgrade notes before updating the vhost.
+
+### Added
+- **HTTPS for `deploy/lanmng.nginx.conf`.** The dashboard used to be served in
+  plain HTTP on `:81`, so the login password and the session cookie crossed the
+  LAN and any VPN in clear. One server block now serves it over TLS on `:443`,
+  under its own `server_name`, and on `:81` by IP address, for clients that do not
+  use your local DNS. Plain HTTP on `:80` (for that name) and on `:81` redirects to
+  HTTPS. The session cookie gets the `Secure` flag automatically.
+- `scripts/smoke.py --cacert <file>`: trust a private CA. TLS verification is
+  always on; without the option the system trust store is used.
+
+### Fixed
+- `scripts/smoke.py` now checks that every script and stylesheet referenced by the
+  index is served with a JavaScript/CSS content type. A frontend copied file by
+  file could miss `i18n.js` and `i18n/`: nginx answered with `index.html`, the
+  browser refused it and the dashboard stopped before the login page, while the
+  smoke test still passed.
+
+### Upgrade notes
+- **Default setup (`docker-compose.yml`)**: nothing changes, it stays on HTTP.
+- **Host that runs its own nginx (`deploy/docker-compose.host-nginx.yml`)**:
+  1. Get a certificate whose SANs include the name you choose and the host
+     address (for `:81`), signed by a CA your clients trust.
+  2. Put `ssl_certificate`, `ssl_certificate_key` and the protocols in
+     `/etc/nginx/snippets/lanmng-tls.conf`, or symlink an existing TLS snippet.
+  3. Make the name resolve on your local DNS.
+  4. Install the vhost from `deploy/lanmng.nginx.conf`, replacing every
+     `lanmng.example.lan` with your name, then `nginx -t` and reload.
+  5. Copy the whole `frontend/` folder (without `tests/`) to the web root, not a
+     list of files.
+  Bookmarks to `http://<host>:81` keep working: they are redirected.
+
+### Aggiunto
+- **HTTPS per `deploy/lanmng.nginx.conf`.** La dashboard era servita in HTTP in
+  chiaro su `:81`: password di login e cookie di sessione passavano leggibili sulla
+  LAN e su un'eventuale VPN. Ora un unico blocco server la serve in TLS su `:443`,
+  con un suo `server_name`, e su `:81` per indirizzo IP, per i client che non usano
+  il tuo DNS locale. L'HTTP in chiaro su `:80` (per quel nome) e su `:81` rimanda
+  all'HTTPS. Il cookie di sessione prende da solo il flag `Secure`.
+- `scripts/smoke.py --cacert <file>`: si fida di una CA privata. La verifica TLS e'
+  sempre attiva; senza l'opzione vale il trust store del sistema.
+
+### Corretto
+- `scripts/smoke.py` controlla che ogni script e foglio di stile citato dall'index
+  arrivi con un content type JavaScript/CSS. Un frontend copiato file per file
+  poteva perdere `i18n.js` e `i18n/`: nginx rispondeva con `index.html`, il browser
+  lo rifiutava e la dashboard si fermava prima del login, mentre lo smoke passava.
+
+### Note di aggiornamento
+- **Installazione standard (`docker-compose.yml`)**: non cambia nulla, resta in HTTP.
+- **Host con un nginx suo (`deploy/docker-compose.host-nginx.yml`)**:
+  1. Procurati un certificato con fra i SAN il nome scelto e l'indirizzo dell'host
+     (per `:81`), firmato da una CA di cui i tuoi client si fidano.
+  2. Metti `ssl_certificate`, `ssl_certificate_key` e i protocolli in
+     `/etc/nginx/snippets/lanmng-tls.conf`, oppure fai un link a uno snippet TLS
+     che hai gia'.
+  3. Fai risolvere il nome sul tuo DNS locale.
+  4. Installa il vhost da `deploy/lanmng.nginx.conf` sostituendo ogni
+     `lanmng.example.lan` con il tuo nome, poi `nginx -t` e reload.
+  5. Copia l'intera cartella `frontend/` (senza `tests/`) nella web root, non un
+     elenco di file.
+  I segnalibri a `http://<host>:81` continuano a funzionare: vengono rediretti.
+
 ## [1.1.3] - 2026-09-24
 
 Security release for the connection between nginx and the backend. It changes the
@@ -261,7 +328,9 @@ Primo rilascio pubblico.
 - Repository initialized under the MIT License.
 - Repository inizializzato con licenza MIT.
 
-[Unreleased]: https://github.com/Yul-1/LAN-Manager/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/Yul-1/LAN-Manager/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/Yul-1/LAN-Manager/compare/v1.1.3...v1.2.0
+[1.1.3]: https://github.com/Yul-1/LAN-Manager/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/Yul-1/LAN-Manager/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/Yul-1/LAN-Manager/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/Yul-1/LAN-Manager/compare/v1.0.0...v1.1.0

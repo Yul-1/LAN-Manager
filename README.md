@@ -107,6 +107,14 @@ file. The backend has no TCP port: your nginx reaches it on the unix socket
 `/run/lanmng/backend.sock`, whose directory is created by
 `deploy/lanmng.tmpfiles.conf` (install it in `/etc/tmpfiles.d/`).
 
+That profile serves the dashboard over **HTTPS only**, from one server block:
+on `:443` under a name of your choice (next to your other vhosts), and on `:81`
+by IP address, for clients that do not resolve that name. Plain HTTP on `:80`
+(for that name) and on `:81` redirects to HTTPS. You bring the certificate: its
+SANs must include the name and the host address, and
+`/etc/nginx/snippets/lanmng-tls.conf` must hold the `ssl_certificate` lines
+(a symlink to an existing TLS snippet is enough).
+
 ## Configuration
 
 Everything is editable from the **Settings** page. If you prefer files, the
@@ -140,6 +148,9 @@ secret is set, never its value.
 
 ### Security fixes
 
+- **1.2.0** — With your own nginx, the dashboard is now served over HTTPS only, so
+  the login password and the session cookie no longer cross the network in clear.
+  This needs a certificate; see the [CHANGELOG](CHANGELOG.md#120---2026-09-24).
 - **1.1.3** — The backend no longer listens on a local TCP port, which any process
   on the host could reach and use to spoof the client address. Hosts that run their
   own nginx need a one-time setup step; see the
