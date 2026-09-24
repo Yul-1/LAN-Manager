@@ -64,6 +64,7 @@ STREAM_TOOLS = ("ping", "traceroute", "dig", "nmap", "arping")
 # Metodi HTTP ammessi dal tool "http": solo quelli che leggono, mai uno che
 # scrive. Lo strumento serve a guardare, e da qui passa qualunque URL.
 _HTTP_METHODS = ("GET", "HEAD")
+_HTTP_MAX_REDIRECT = 10
 
 
 class ToolError(ValueError):
@@ -499,10 +500,28 @@ async def _http(target: str, opts: dict) -> dict:
 
     started = time.monotonic()
     righe: list[str] = []
+    passi: list = []
+    fermato = ""
     try:
-        async with httpx.AsyncClient(follow_redirects=segui, timeout=timeout,
+        # I redirect si seguono a mano: httpx li seguirebbe senza chiedere, e il
+        # controllo sul bersaglio varrebbe solo per il primo salto. Un server
+        # della LAN che risponde `302 Location: http://127.0.0.1/...` portava il
+        # tool sul loopback dell'host del backend (pentest 2026-09-24, G4).
+        async with httpx.AsyncClient(follow_redirects=False, timeout=timeout,
                                      verify=bool(opts.get("verify", True))) as client:
             r = await client.request(metodo, url)
+            while segui and r.next_request is not None:
+                prossimo = r.next_request
+                if len(passi) >= _HTTP_MAX_REDIRECT:
+                    fermato = f"troppi redirect (oltre {_HTTP_MAX_REDIRECT}): catena interrotta"
+                    break
+                if prossimo.url.scheme not in ("http", "https") \
+                        or await target_blocked(prossimo.url.host):
+                    fermato = (f"redirect verso {prossimo.url} non seguito: bersaglio non "
+                               f"consentito (indirizzo speciale o locale)")
+                    break
+                passi.append(r)
+                r = await client.send(prossimo)
     except httpx.HTTPError as e:
         return _esito("http", url, f"{metodo} {url}",
                       f"richiesta fallita: {e.__class__.__name__}: {e}", False,
@@ -510,10 +529,12 @@ async def _http(target: str, opts: dict) -> dict:
     ms = round((time.monotonic() - started) * 1000)
     # La catena di redirect e' la meta' della risposta a "perche' non funziona":
     # senza, un 200 finale nasconde tre salti e magari un downgrade a http.
-    for passo in r.history:
+    for passo in passi:
         righe.append(f"{passo.status_code} {passo.reason_phrase}  {passo.request.url}"
                      f"  →  {passo.headers.get('location', '')}")
     righe.append(f"{r.status_code} {r.reason_phrase}  {r.request.url}")
+    if fermato:
+        righe.append(fermato)
     righe.append("")
     for k in ("server", "content-type", "content-length", "location", "cache-control"):
         if k in r.headers:
@@ -531,7 +552,7 @@ async def _http(target: str, opts: dict) -> dict:
             righe.append("")
             righe.append(f"(corpo non testuale, {len(r.content)} byte)")
     return _esito("http", url, f"{metodo} {url}", "\n".join(righe),
-                  r.status_code < 400, ms)
+                  r.status_code < 400 and not fermato, ms)
 
 
 # ── Misura di velocita' ────────────────────────────────────────────

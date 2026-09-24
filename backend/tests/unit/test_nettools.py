@@ -266,6 +266,64 @@ async def _sempre_bloccato(host):
     return True
 
 
+# Redirect: il controllo sul bersaglio vale a ogni salto, non solo al primo
+# (pentest 2026-09-24, G4: un 302 verso 127.0.0.1 veniva seguito).
+
+def _server_finto(monkeypatch, rotte: dict):
+    """httpx vero, rete finta: `rotte` mappa l'URL richiesto alla risposta."""
+    import httpx
+
+    visti: list[str] = []
+
+    def gestore(request):
+        visti.append(str(request.url))
+        status, location = rotte.get(str(request.url), (404, ""))
+        headers = {"location": location} if location else {}
+        return httpx.Response(status, headers=headers, text="ok")
+
+    vero = httpx.AsyncClient
+    monkeypatch.setattr(httpx, "AsyncClient",
+                        lambda **kw: vero(transport=httpx.MockTransport(gestore), **kw))
+    return visti
+
+
+async def test_un_redirect_verso_il_loopback_non_viene_seguito(monkeypatch):
+    visti = _server_finto(monkeypatch, {
+        "http://192.168.1.10/": (302, "http://127.0.0.1:81/api/auth/status"),
+    })
+    r = await _http("http://192.168.1.10/", {})
+    assert visti == ["http://192.168.1.10/"], "il loopback non va mai contattato"
+    assert "non seguito" in r["output"]
+    assert r["exit_code"] == 1
+
+
+async def test_un_redirect_verso_un_altro_host_della_lan_viene_seguito(monkeypatch):
+    visti = _server_finto(monkeypatch, {
+        "http://192.168.1.10/": (301, "/nuova"),
+        "http://192.168.1.10/nuova": (302, "http://192.168.1.20/"),
+        "http://192.168.1.20/": (200, ""),
+    })
+    r = await _http("http://192.168.1.10/", {})
+    assert visti[-1] == "http://192.168.1.20/"
+    assert r["exit_code"] == 0
+    assert "301 Moved Permanently  http://192.168.1.10/" in r["output"]
+
+
+async def test_senza_follow_il_redirect_resta_la_risposta(monkeypatch):
+    visti = _server_finto(monkeypatch, {"http://192.168.1.10/": (302, "http://192.168.1.20/")})
+    r = await _http("http://192.168.1.10/", {"follow": False})
+    assert visti == ["http://192.168.1.10/"]
+    assert r["output"].startswith("302 Found")
+
+
+async def test_una_catena_infinita_di_redirect_si_ferma(monkeypatch):
+    visti = _server_finto(monkeypatch, {"http://192.168.1.10/": (302, "/")})
+    r = await _http("http://192.168.1.10/", {})
+    assert len(visti) == nettools._HTTP_MAX_REDIRECT + 1
+    assert "troppi redirect" in r["output"]
+    assert r["exit_code"] == 1
+
+
 # Misura di velocita'
 
 async def test_la_misura_di_velocita_non_accetta_piu_del_tetto(monkeypatch):
