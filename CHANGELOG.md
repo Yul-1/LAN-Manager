@@ -12,6 +12,80 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.2.1] - 2026-09-24
+
+Security release. None of these issues let someone in without logging in on the
+default configuration; most of them need a valid session. Upgrading is recommended.
+Everyone has to log in once more after the update.
+
+### Security
+- **A command could be hidden from the terminal audit log.** Aborting a real password
+  prompt with Ctrl+C left the "don't log the next line" flag set, so the next command
+  was missing from `audit.log`. Ctrl+C now clears it.
+- **The `http` network tool followed redirects to blocked targets.** Loopback and other
+  special addresses were refused only for the first URL: a LAN host redirecting to
+  `127.0.0.1` reached services bound to the backend host's loopback. Every redirect hop
+  is now checked, and the chain stops at a blocked one.
+- **The terminal accepted loopback hosts, and its key field revealed which files
+  existed in the container.** Adding a terminal host now refuses special addresses, and
+  the key must be one of those listed from the mounted key folder.
+- **The CSRF check ignored the port.** A page served by another service on the same
+  address counted as same-origin. Host and port are now compared.
+- **Device, service and alert changes relied on the global login only.** With
+  `auth.bypass_lan` enabled they worked without logging in, as did reading the router
+  firewall rules. They now always require an admin session.
+- **Audit log injection.** A typed command with quotes and `=` could add fake
+  `key=value` fields to `audit.log`. Values are now always quoted and escaped when needed.
+- **Changing the admin password now logs out every other session.** A stolen session
+  cookie used to stay valid for up to 7 days even after a password change. The browser
+  you change it from stays logged in.
+- The SNMP `community` is masked in the Settings editor like the other secrets.
+- `ubus` call parameters are shell-quoted.
+
+### Upgrade notes
+- **Log in again** after updating: existing session cookies are no longer valid.
+- **Own reverse proxy**: it must forward the original `Host` header *with the port*
+  (nginx: `proxy_set_header Host $http_host;`), otherwise saving anything fails with
+  "origin not allowed". The bundled nginx configurations already do this.
+- **`auth.bypass_lan: true`**: log in to add, edit or remove devices and services.
+- **Terminal hosts with a custom key**: the key must be in the mounted SSH key folder;
+  pick it from the list on the Terminal page.
+
+### Sicurezza
+- **Un comando poteva sparire dal registro di audit del terminale.** Interrompere con
+  Ctrl+C un vero prompt di password lasciava attivo il "non registrare la prossima
+  riga", e il comando successivo mancava da `audit.log`. Ora Ctrl+C lo azzera.
+- **Il tool di rete `http` seguiva i redirect verso bersagli vietati.** Loopback e altri
+  indirizzi speciali erano rifiutati solo per il primo URL: un host della LAN che
+  rimandava a `127.0.0.1` raggiungeva i servizi in ascolto sul loopback dell'host del
+  backend. Ora ogni salto viene controllato e la catena si ferma su quello vietato.
+- **Il terminale accettava host di loopback, e il campo chiave rivelava quali file
+  esistevano nel container.** Aggiungere un host ora rifiuta gli indirizzi speciali, e
+  la chiave dev'essere una di quelle elencate dalla cartella delle chiavi montata.
+- **Il controllo CSRF ignorava la porta.** Una pagina servita da un altro servizio sullo
+  stesso indirizzo contava come stessa origine. Ora si confrontano host e porta.
+- **Le modifiche a dispositivi, servizi e alert si affidavano al solo login globale.**
+  Con `auth.bypass_lan` attivo funzionavano senza login, come la lettura delle regole
+  firewall del router. Ora richiedono sempre una sessione admin.
+- **Iniezione nel registro di audit.** Un comando con virgolette e `=` poteva aggiungere
+  a `audit.log` campi `chiave=valore` finti. Ora i valori si quotano sempre, con
+  l'escape dove serve.
+- **Cambiare la password admin ora chiude tutte le altre sessioni.** Un cookie di
+  sessione rubato restava valido fino a 7 giorni anche dopo il cambio password. Il
+  browser da cui la cambi resta collegato.
+- La `community` SNMP e' mascherata nell'editor delle Impostazioni come gli altri segreti.
+- I parametri di `ubus call` sono quotati per la shell.
+
+### Note di aggiornamento
+- **Rifai il login** dopo l'aggiornamento: i cookie di sessione esistenti non valgono piu'.
+- **Reverse proxy tuo**: deve inoltrare l'header `Host` originale *con la porta*
+  (nginx: `proxy_set_header Host $http_host;`), altrimenti ogni salvataggio fallisce
+  con "origin not allowed". Le configurazioni nginx incluse lo fanno gia'.
+- **`auth.bypass_lan: true`**: per aggiungere, modificare o rimuovere dispositivi e
+  servizi serve il login.
+- **Host del terminale con una chiave propria**: la chiave dev'essere nella cartella
+  delle chiavi SSH montata; sceglila dall'elenco nella pagina Terminale.
+
 ## [1.2.0] - 2026-09-24
 
 HTTPS for the setup that uses your own nginx. It changes the deployment: read the
@@ -328,7 +402,8 @@ Primo rilascio pubblico.
 - Repository initialized under the MIT License.
 - Repository inizializzato con licenza MIT.
 
-[Unreleased]: https://github.com/Yul-1/LAN-Manager/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/Yul-1/LAN-Manager/compare/v1.2.1...HEAD
+[1.2.1]: https://github.com/Yul-1/LAN-Manager/compare/v1.2.0...v1.2.1
 [1.2.0]: https://github.com/Yul-1/LAN-Manager/compare/v1.1.3...v1.2.0
 [1.1.3]: https://github.com/Yul-1/LAN-Manager/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/Yul-1/LAN-Manager/compare/v1.1.1...v1.1.2

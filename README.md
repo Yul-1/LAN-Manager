@@ -148,6 +148,10 @@ secret is set, never its value.
 
 ### Security fixes
 
+- **1.2.1** — Hardening across the terminal audit log, the network tools, the CSRF
+  check and session handling. Changing the admin password now logs out every other
+  session, and everyone has to log in once after updating; see the
+  [CHANGELOG](CHANGELOG.md#121---2026-09-24).
 - **1.2.0** — With your own nginx, the dashboard is now served over HTTPS only, so
   the login password and the session cookie no longer cross the network in clear.
   This needs a certificate; see the [CHANGELOG](CHANGELOG.md#120---2026-09-24).

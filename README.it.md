@@ -151,6 +151,10 @@ se un segreto e' impostato, mai quale sia.
 
 ### Correzioni di sicurezza
 
+- **1.2.1** — Rafforzamenti su registro di audit del terminale, strumenti di rete,
+  controllo CSRF e gestione delle sessioni. Cambiare la password admin ora chiude
+  tutte le altre sessioni, e dopo l'aggiornamento serve rifare il login una volta;
+  vedi il [CHANGELOG](CHANGELOG.md#121---2026-09-24).
 - **1.2.0** — Con un nginx tuo, la dashboard ora e' servita solo in HTTPS: password
   di login e cookie di sessione non passano piu' in chiaro sulla rete. Serve un
   certificato; vedi il [CHANGELOG](CHANGELOG.md#120---2026-09-24).
