@@ -8,8 +8,8 @@ login e' ancora obbligatorio e se ogni gruppo di endpoint risponde.
 
 Uso:
     export LANMNG_PASS='...'                 # mai sulla riga di comando
-    backend/.venv/bin/python scripts/smoke.py --base http://<host>:81 \
-        --expect-version "$(cat VERSION)"
+    backend/.venv/bin/python scripts/smoke.py --base https://<nome-di-lanmng> \
+        --cacert <ca-root.crt> --expect-version "$(cat VERSION)"
 
 Variabili d'ambiente:
     LANMNG_URL   indirizzo base (sovrascritto da --base)
@@ -19,6 +19,11 @@ Variabili d'ambiente:
 In alternativa: --password-file <percorso> (una riga, permessi 600), oppure la
 password su stdin (`... < file` o `pass show ... | ...`). Se il terminale e'
 interattivo e non e' stato indicato nulla, viene chiesta senza essere stampata.
+
+In HTTPS il certificato si verifica sempre. Senza opzioni vale il trust store
+del sistema (non il bundle di certifi che httpx userebbe da solo); --cacert
+indica invece la CA privata che ha firmato il certificato del server, utile
+dove quella CA non e' installata (per esempio in WSL).
 
 Esce 0 se tutto passa, 1 al primo controllo fallito.
 """
@@ -30,6 +35,7 @@ import getpass
 import json
 import os
 import re
+import ssl
 import sys
 
 import httpx
@@ -83,7 +89,8 @@ def asset_sbagliati(html: str, scarica) -> list[str]:
     return sbagliati
 
 
-async def _websocket(base: str, cookie: str, timeout: float) -> tuple[bool, str]:
+async def _websocket(base: str, cookie: str, timeout: float,
+                     tls: ssl.SSLContext | None) -> tuple[bool, str]:
     """Primo frame dello stream live. E' l'unico controllo che copre il
     collector e il lifespan, che i test di integrazione non toccano."""
     try:
@@ -95,7 +102,8 @@ async def _websocket(base: str, cookie: str, timeout: float) -> tuple[bool, str]
     try:
         async with websockets.connect(
                 url, additional_headers={"Cookie": cookie, "Origin": origine},
-                open_timeout=timeout, close_timeout=2) as ws:
+                open_timeout=timeout, close_timeout=2,
+                **({"ssl": tls} if url.startswith("wss://") else {})) as ws:
             messaggio = json.loads(await asyncio.wait_for(ws.recv(), timeout))
     except Exception as e:
         return False, f"{type(e).__name__}: {e}"
@@ -113,13 +121,23 @@ def main() -> int:
     ap.add_argument("--no-ws", action="store_true", help="salta il controllo WebSocket")
     ap.add_argument("--password-file", default="",
                     help="file contenente la password admin (una riga)")
+    ap.add_argument("--cacert", default="",
+                    help="certificato della CA che ha firmato quello del server (PEM)")
     args = ap.parse_args()
 
     base = args.base.rstrip("/")
     utente = os.environ.get("LANMNG_USER", "admin")
     print(f"LANMng smoke — {base}\n")
 
-    c = httpx.Client(base_url=base, timeout=args.timeout, follow_redirects=False)
+    # La verifica del certificato resta sempre attiva: --cacert aggiunge una CA,
+    # non la spegne.
+    try:
+        tls = ssl.create_default_context(cafile=args.cacert or None)
+    except (OSError, ssl.SSLError) as e:
+        esito(False, "certificato CA leggibile", f"{args.cacert}: {e}")
+        return 1
+    c = httpx.Client(base_url=base, timeout=args.timeout, follow_redirects=False,
+                     verify=tls)
 
     # 1. Versione realmente in esercizio.
     try:
@@ -202,7 +220,7 @@ def main() -> int:
 
     # 7. Stream live.
     if not args.no_ws:
-        ok, dettaglio = asyncio.run(_websocket(base, cookie, args.timeout))
+        ok, dettaglio = asyncio.run(_websocket(base, cookie, args.timeout, tls))
         if not esito(ok, "WebSocket /ws", dettaglio):
             return 1
 
