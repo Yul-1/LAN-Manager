@@ -30,6 +30,14 @@ def test_tutte_le_chiavi_segrete_sono_coperte():
     assert set(fuori.values()) == {MASK}
 
 
+def test_la_community_snmp_e_un_segreto():
+    dentro = {"discovery": {"snmp": {"enabled": True, "community": "privata"}}}
+    fuori = _redact(dentro)
+    assert fuori["discovery"]["snmp"]["community"] == MASK
+    # E tornando indietro mascherata si riprende quella vera.
+    assert _merge_secrets(fuori, dentro) == dentro
+
+
 def test_un_segreto_vuoto_resta_vuoto():
     # Mascherare il vuoto farebbe credere che una password sia impostata.
     fuori = _redact({"password": "", "luci_password": None})

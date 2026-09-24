@@ -26,8 +26,11 @@ from config import Settings, settings
 
 log = logging.getLogger("config-store")
 
-# Chiavi il cui valore non va mai mostrato in chiaro nella UI.
-SECRET_KEYS = {"password", "luci_password", "password_hash"}
+# Chiavi il cui valore non va mai mostrato in chiaro nella UI. La community
+# SNMP e' a tutti gli effetti la password dei dispositivi SNMP (pentest
+# 2026-09-24, G7): oggi e' "public", ma il giorno che la si cambia non deve
+# essere leggibile da chiunque abbia una sessione.
+SECRET_KEYS = {"password", "luci_password", "password_hash", "community"}
 MASK = "********"
 
 # Campi che identificano un elemento di lista (es. un host), per ripristinare i
