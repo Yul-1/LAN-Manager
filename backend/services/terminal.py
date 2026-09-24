@@ -276,6 +276,11 @@ class TerminalSession:
                 self._line = self._line[:-1]
             elif ch == "\x03":               # Ctrl+C: la riga viene abbandonata
                 self._line = ""
+                # Anche il prompt di password eventualmente in attesa: se il flag
+                # sopravvivesse, il comando successivo sparirebbe dal registro
+                # (pentest 2026-09-24, G5: bastava abortire un prompt vero).
+                self._skip_line = False
+                self._out_tail = ""
             elif ch >= " ":
                 self._line += ch
             if len(self._line) > 4096:       # incolli enormi: non li accumuliamo

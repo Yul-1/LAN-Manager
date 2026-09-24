@@ -131,6 +131,21 @@ def test_la_soppressione_vale_per_una_riga_sola(sessione):
     assert _comandi(sessione) == ["uptime"]
 
 
+def test_ctrl_c_su_un_prompt_di_password_non_nasconde_il_comando_dopo(sessione):
+    # Pentest 2026-09-24 (G5): prompt vero abortito con Ctrl+C, poi un comando.
+    # Il flag di soppressione restava appeso e il comando spariva dal registro.
+    sessione._note_output("nosuchuser@127.0.0.1's password: ")
+    sessione._track_input("\x03")
+    sessione._track_input("id\r")
+    assert _comandi(sessione) == ["id"]
+
+
+def test_ctrl_c_a_meta_password_non_la_registra(sessione):
+    sessione._note_output("Password: ")
+    sessione._track_input("mezza-pass\x03")
+    assert _comandi(sessione) == []
+
+
 def test_una_parola_password_a_meta_riga_non_sopprime(sessione):
     # Il prompt e' riconosciuto solo a fine riga: "cat password.txt" e' un comando.
     sessione._note_output("user@host:~$ ")
