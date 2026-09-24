@@ -5,8 +5,9 @@ Traccia chi ha fatto cosa con i tool di rete e il terminale SSH. Le righe
 vanno sia nei log del container (visibili da `docker logs`) sia in un file
 persistente nella cartella config, che e' gia' montata in scrittura.
 
-Formato: una riga per evento, `chiave=valore` separati da spazio, con i
-valori quotati solo se contengono spazi. Leggibile a occhio e con grep.
+Formato: una riga per evento, `chiave=valore` separati da spazio. Un valore
+con spazi, `"`, `=` o `\\` (o vuoto) va fra virgolette, con `\\` e `"` preceduti
+da `\\`. Leggibile a occhio e con grep.
 """
 from __future__ import annotations
 
@@ -44,7 +45,14 @@ def _fmt(value) -> str:
     text = str(value).replace("\n", " ").replace("\r", " ")
     if len(text) > _MAX_VALUE:
         text = text[:_MAX_VALUE] + "…"
-    return f'"{text}"' if (" " in text or not text) else text
+    # Virgolette e `=` dentro un valore non quotato (o una `"` dentro uno
+    # quotato) permettevano a un comando digitato di chiudere il campo e
+    # aggiungere coppie `chiave=valore` mai scritte dal codice (pentest
+    # 2026-09-24, G6). Si quota ogni valore "strano" e si fa l'escape come il
+    # parser in services/log_sources.py (`_COPPIA_RE`) si aspetta.
+    if not text or any(c in text for c in ' "=\\'):
+        return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
+    return text
 
 
 def audit(event: str, **fields) -> None:
