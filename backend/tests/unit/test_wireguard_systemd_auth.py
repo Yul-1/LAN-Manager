@@ -192,9 +192,33 @@ def test_origin_uguale_allhost_passa():
     assert same_origin(_Richiesta(origin="http://testserver", host="testserver")) is True
 
 
-def test_origin_con_porta_diversa_passa():
-    # nginx forwarda Host senza porta, l'Origin la include: si confronta l'hostname.
-    assert same_origin(_Richiesta(origin="http://192.0.2.30:81", host="192.0.2.30")) is True
+def test_origin_con_la_stessa_porta_passa():
+    # nginx inoltra `Host $http_host`: porta inclusa, come nell'Origin.
+    assert same_origin(_Richiesta(origin="https://192.0.2.30:81", host="192.0.2.30:81")) is True
+
+
+def test_la_porta_di_default_puo_mancare_da_una_parte():
+    assert same_origin(_Richiesta(origin="https://lanmng.example", host="lanmng.example:443")) is True
+    assert same_origin(_Richiesta(origin="https://lanmng.example:443", host="lanmng.example")) is True
+
+
+@pytest.mark.parametrize("origin,host", [
+    # Pentest 2026-09-24 (G8): stesso IP, altro servizio -> altra origine.
+    ("https://192.0.2.30:9999", "192.0.2.30:81"),
+    ("http://192.0.2.30", "192.0.2.30:81"),
+    ("http://192.0.2.30:81", "192.0.2.30"),
+    ("https://192.0.2.30:3001", "192.0.2.30"),
+])
+def test_origin_con_porta_diversa_viene_respinta(origin, host):
+    assert same_origin(_Richiesta(origin=origin, host=host)) is False
+
+
+def test_host_ipv6_con_porta():
+    assert same_origin(_Richiesta(origin="https://[2001:db8::1]:81", host="[2001:db8::1]:81")) is True
+
+
+def test_origin_con_schema_sconosciuto_viene_respinta():
+    assert same_origin(_Richiesta(origin="null", host="testserver")) is False
 
 
 def test_origin_di_un_altro_host_viene_respinta():

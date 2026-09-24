@@ -36,6 +36,7 @@ log = logging.getLogger("auth")
 COOKIE = "lanmng_session"
 TTL = 7 * 24 * 3600          # durata sessione: 7 giorni
 _MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
+_DEFAULT_PORTS = {"http": 80, "https": 443}
 
 
 def same_origin(request) -> bool:
@@ -49,14 +50,26 @@ def same_origin(request) -> bool:
     origin = request.headers.get("origin")
     if not origin:
         return True   # niente Origin: client non-browser o same-origin -> non e' un vettore CSRF
+    # Confronto su host E porta: un altro servizio sullo stesso IP (qui :80,
+    # :443, :3001) e' un'altra origine, e con la sola porta ignorata una sua
+    # pagina passava il controllo (pentest 2026-09-24, G8). Funziona perche'
+    # entrambi i vhost inoltrano `Host $http_host`, cioe' con la porta.
     try:
-        origin_host = (urlparse(origin).hostname or "").lower()
+        o = urlparse(origin)
+        h = urlparse("//" + request.headers.get("host", ""))
+        origin_host, origin_port = (o.hostname or "").lower(), o.port
+        req_host, req_port = (h.hostname or "").lower(), h.port
     except ValueError:
         return False
-    # Confronto per hostname (ignora la porta): nginx forwarda `Host` via $host
-    # senza porta, mentre l'Origin la include. Sufficiente contro CSRF cross-site.
-    req_host = request.headers.get("host", "").split(":")[0].lower()
-    return bool(origin_host) and origin_host == req_host
+    default = _DEFAULT_PORTS.get(o.scheme)
+    if origin_port is None:
+        origin_port = default
+    # Host senza porta: il browser la omette quando e' quella di default dello
+    # schema, quindi vale la default dello schema dell'Origin.
+    if req_port is None:
+        req_port = default
+    return (bool(origin_host) and origin_port is not None
+            and (origin_host, origin_port) == (req_host, req_port))
 
 
 def auth_enabled() -> bool:

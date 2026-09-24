@@ -253,9 +253,9 @@ def scanner_finto(monkeypatch):
 
 @pytest.fixture
 def origine_valida():
-    """Header che soddisfa la difesa CSRF: `same_origin` confronta il solo
-    hostname di Origin con quello di Host, e sotto TestClient Host e'
-    "testserver"."""
+    """Header che soddisfa la difesa CSRF: `same_origin` confronta host e
+    porta di Origin con quelli di Host, e sotto TestClient Host e'
+    "testserver" (porta di default dello schema)."""
     return {"Origin": "http://testserver"}
 
 
