@@ -29,6 +29,7 @@ import asyncio
 import getpass
 import json
 import os
+import re
 import sys
 
 import httpx
@@ -54,6 +55,32 @@ def _password(percorso_file: str) -> str:
     if not sys.stdin.isatty():
         return sys.stdin.read().strip()          # password su stdin
     return getpass.getpass("Password admin (non viene stampata): ")
+
+
+# Asset locali dell'index con il tipo che il browser pretende. Con
+# `X-Content-Type-Options: nosniff` uno script servito come text/html non
+# viene eseguito: e' quello che succede quando il file manca sul server e
+# nginx ripiega su index.html (fallback della SPA), e la pagina si ferma.
+TIPI_ASSET = {".js": "javascript", ".css": "text/css"}
+
+
+def asset_locali(html: str) -> list[str]:
+    """Percorsi degli script e dei fogli di stile locali citati dall'index."""
+    percorsi = re.findall(r'<(?:script[^>]*\ssrc|link[^>]*\shref)="(\./[^"]+)"', html)
+    return [x for x in percorsi if x.split("?")[0].endswith(tuple(TIPI_ASSET))]
+
+
+def asset_sbagliati(html: str, scarica) -> list[str]:
+    """Asset che non arrivano (status diverso da 200) o con il tipo sbagliato.
+
+    `scarica(percorso)` ritorna (status, content-type)."""
+    sbagliati = []
+    for percorso in asset_locali(html):
+        status, tipo = scarica(percorso)
+        atteso = TIPI_ASSET["." + percorso.split("?")[0].rsplit(".", 1)[1]]
+        if status != 200 or atteso not in (tipo or ""):
+            sbagliati.append(f"{percorso} -> {status} {tipo}")
+    return sbagliati
 
 
 async def _websocket(base: str, cookie: str, timeout: float) -> tuple[bool, str]:
@@ -185,6 +212,16 @@ def main() -> int:
     ok = r.status_code == 200 and f"?v={versione}" in r.text
     if not esito(ok, "frontend servito con gli asset versionati",
                  f"atteso ?v={versione}"):
+        return 1
+
+    # 9. Ogni asset dell'index c'e' davvero ed e' eseguibile dal browser.
+    def scarica(percorso: str) -> tuple[int, str]:
+        risposta = c.get("/" + percorso[2:])
+        return risposta.status_code, risposta.headers.get("content-type", "")
+
+    sbagliati = asset_sbagliati(r.text, scarica)
+    if not esito(not sbagliati, "asset dell'index serviti col tipo giusto",
+                 "; ".join(sbagliati) or f"{len(asset_locali(r.text))} asset"):
         return 1
 
     c.post("/api/auth/logout", headers={"Origin": base})
