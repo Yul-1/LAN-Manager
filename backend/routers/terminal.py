@@ -18,6 +18,7 @@ from middleware.auth import password_set, require_session, same_origin, session_
 from services.audit import audit
 from services.config_store import get_config_store
 from services.errors import exc_text
+from services.nettools import target_blocked
 from services.ssh_hosts import live_ssh_config, validate_key_path
 from services.terminal import TerminalSession, allowed_hosts, available_keys
 
@@ -51,11 +52,21 @@ _HOST_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,253}$")
 
 
 def _validated_key(key: str) -> str:
-    """Percorso della chiave validato (regola condivisa con le Impostazioni)."""
+    """Percorso della chiave: solo una di quelle che la UI offre in elenco.
+
+    Il controllo sul file (inesistente / non leggibile) dava messaggi diversi
+    per ogni percorso del container, cioe' un oracolo di esistenza dei file
+    (pentest 2026-09-24, G3). Restano distinti solo gli errori di *forma*,
+    che non dicono nulla del filesystem."""
     try:
-        return validate_key_path(key)
+        key = validate_key_path(key, check_file=False)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    if key not in available_keys():
+        raise HTTPException(status_code=400,
+                            detail="chiave non disponibile: scegline una dall'elenco "
+                                   "(cartella delle chiavi montata nel container)")
+    return key
 
 
 def _save_hosts(hosts: list[dict], event: str, request: Request, **fields):
@@ -83,6 +94,13 @@ async def add_host(body: HostBody, request: Request):
     host = body.host.strip()
     if not _HOST_RE.match(host):
         raise HTTPException(status_code=400, detail="nome host o IP non valido")
+    # Stessa regola del tool http: niente loopback, link-local e simili. Senza,
+    # il terminale diventava una via per aprire SSH verso servizi solo-locali
+    # dell'host del backend (pentest 2026-09-24, G2). L'host di LANMng stesso resta
+    # raggiungibile: arriva dalla sezione `systemd`, non da qui.
+    if await target_blocked(host):
+        raise HTTPException(status_code=400,
+                            detail="host non consentito (indirizzo speciale o locale)")
     if not 1 <= body.port <= 65535:
         raise HTTPException(status_code=400, detail="porta fuori intervallo")
 

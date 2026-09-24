@@ -324,6 +324,25 @@ def test_un_servizio_su_un_host_configurato_si_salva(auth_client, monkeypatch):
         get_service_store().remove("systemd", "prova-ssh.service")
 
 
+# ── Terminale: host e chiavi aggiungibili dalla UI ─────────────────
+#  Pentest 2026-09-24: G2 (loopback accettato come host) e G3 (messaggi
+#  diversi per file assente / illeggibile = oracolo di esistenza).
+
+def test_il_terminale_non_accetta_host_locali(auth_client):
+    from services.ssh_hosts import live_ssh_config
+    r = auth_client.post("/api/terminal/hosts", json={"host": "127.0.0.1", "port": 22})
+    assert r.status_code == 400
+    assert not any(h.ip == "127.0.0.1" for h in live_ssh_config().hosts)
+
+
+def test_la_chiave_del_terminale_non_rivela_quali_file_esistono(auth_client):
+    risposte = [auth_client.post("/api/terminal/hosts",
+                                 json={"host": "192.0.2.77", "key": k})
+                for k in ("/etc/shadow", "/non/esiste/xyz", "/etc/hostname")]
+    assert {r.status_code for r in risposte} == {400}
+    assert len({r.json()["detail"] for r in risposte}) == 1
+
+
 # ── CSRF ───────────────────────────────────────────────────────────
 
 def test_una_origine_estranea_sulle_scritture_e_respinta(auth_client, origine_estranea):
