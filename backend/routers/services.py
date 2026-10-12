@@ -56,11 +56,16 @@ class ServiceEntry(BaseModel):
     unit: str = ""
     critical: bool = False
     # windows_service: name + label + critical + host (obbligatorio)
-    # http/tcp/ping
-    type: str = "http"           # http | tcp | ping
+    # http/tcp/ping/snmp
+    type: str = "http"           # http | tcp | ping | snmp
     host: str = ""
     port: int = 0
     expect_status: list[int] = []
+    # snmp: OID numerico, profilo di credenziali, condizione e valore atteso
+    oid: str = ""
+    profile: str = ""
+    op: str = "responds"
+    value: str = ""
     # Comune ai tre metodi: comparire o no fra i servizi in evidenza in dashboard.
     dashboard: bool = True
 
@@ -77,6 +82,40 @@ def _host_ssh_consentito(host: str) -> str:
             detail=(f"host {host} non configurato per SSH: aggiungilo prima "
                     "agli host SSH (Terminale o Impostazioni)"))
     return host
+
+
+def _snmp_entry(b: ServiceEntry) -> dict:
+    """Campi di un servizio `snmp`, validati qui: un OID o un profilo sbagliati
+    si scoprirebbero solo come servizio "giu'" al giro successivo."""
+    from config import settings
+    from services.healthcheck import SNMP_OPS
+    from services.snmp import valid_host, valid_oid
+    try:
+        host = valid_host(b.host)
+        oid = valid_oid(b.oid)
+    except ValueError as err:
+        raise HTTPException(status_code=400, detail=str(err))
+    profilo = (b.profile or "default").strip().lower()
+    if profilo not in {p.name for p in settings.discovery.snmp.all_profiles()}:
+        raise HTTPException(status_code=400,
+                            detail=f"profilo SNMP '{profilo}' non definito (Impostazioni)")
+    if b.op not in SNMP_OPS:
+        raise HTTPException(status_code=400,
+                            detail=f"condizione non valida: usa una fra {', '.join(SNMP_OPS)}")
+    if b.op != "responds" and not b.value.strip():
+        raise HTTPException(status_code=400, detail="indica il valore atteso")
+    if b.op in ("gt", "lt"):
+        try:
+            float(b.value)
+        except ValueError:
+            raise HTTPException(status_code=400,
+                                detail="con maggiore/minore il valore dev'essere un numero")
+    e = {"host": host, "oid": oid, "op": b.op}
+    if profilo != "default":
+        e["profile"] = profilo
+    if b.op != "responds":
+        e["value"] = b.value.strip()[:200]
+    return e
 
 
 def _entry_for_kind(b: ServiceEntry) -> dict:
@@ -110,6 +149,8 @@ def _entry_for_kind(b: ServiceEntry) -> dict:
             e["port"] = b.port
         elif b.type == "ping":
             e["host"] = b.host
+        elif b.type == "snmp":
+            e.update(_snmp_entry(b))
         else:
             raise HTTPException(status_code=400, detail=f"type non valido: {b.type}")
     else:

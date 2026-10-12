@@ -17,7 +17,7 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 # Colore CSS sicuro: solo esadecimale #RGB/#RGBA/#RRGGBB/#RRGGBBAA o nome
 # alfabetico. Neutralizza payload tipo `x"><img onerror=...>` nel campo color.
@@ -263,14 +263,173 @@ class SSHDiscovery(BaseModel):
     _v_hosts = field_validator("hosts", mode="before")(_none_to_list)
 
 
-class SNMPDiscovery(BaseModel):
-    """Interroga device che parlano SNMP (AP, switch, stampanti)."""
-    enabled: bool = False
-    community: str = "public"
-    version: str = "2c"               # 1 | 2c
-    hosts: list[str] = []             # IP da interrogare
+# Valori ammessi dalla CLI net-snmp: elenchi chiusi, cosi' un valore scritto
+# male si rifiuta al salvataggio invece di far fallire ogni interrogazione.
+SNMP_VERSIONS = ("1", "2c", "3")
+SNMP_LEVELS = ("noAuthNoPriv", "authNoPriv", "authPriv")
+SNMP_AUTH_PROTOCOLS = ("MD5", "SHA", "SHA-224", "SHA-256", "SHA-384", "SHA-512")
+SNMP_PRIV_PROTOCOLS = ("DES", "AES", "AES-192", "AES-256")
+_SNMP_PROFILE_RE = re.compile(r"^[a-z0-9_]{1,32}$")
 
-    _v_hosts = field_validator("hosts", mode="before")(_none_to_list)
+
+def _snmp_version(v) -> str:
+    # YAML legge `version: 1` come intero e `version: 2c` come stringa.
+    v = str(v if v is not None else "2c").strip().lower()
+    if v not in SNMP_VERSIONS:
+        raise ValueError(f"versione SNMP dev'essere una fra {', '.join(SNMP_VERSIONS)}: "
+                         f"ricevuto {v!r}")
+    return v
+
+
+class SNMPProfile(BaseModel):
+    """Credenziali SNMP con un nome, riusabili da piu' host.
+
+    Qui c'e' solo la parte non segreta: community e passphrase v3 stanno in
+    secrets.env (pagina Impostazioni, sezione segreti), una voce per profilo.
+    """
+    name: str
+    version: str = "2c"
+    # Solo v3
+    user: str = ""
+    level: str = "authPriv"
+    auth_protocol: str = "SHA"
+    priv_protocol: str = "AES"
+
+    @field_validator("name", mode="before")
+    @classmethod
+    def _v_name(cls, v):
+        v = str(v or "").strip().lower()
+        if not _SNMP_PROFILE_RE.match(v):
+            raise ValueError("nome profilo SNMP: solo lettere minuscole, cifre e _ "
+                             f"(max 32): ricevuto {v!r}")
+        return v
+
+    @field_validator("version", mode="before")
+    @classmethod
+    def _v_version(cls, v):
+        return _snmp_version(v)
+
+    @field_validator("level")
+    @classmethod
+    def _v_level(cls, v):
+        if v not in SNMP_LEVELS:
+            raise ValueError(f"livello SNMPv3 dev'essere uno fra {', '.join(SNMP_LEVELS)}")
+        return v
+
+    @field_validator("auth_protocol", mode="before")
+    @classmethod
+    def _v_auth(cls, v):
+        v = str(v or "SHA").strip().upper()
+        if v not in SNMP_AUTH_PROTOCOLS:
+            raise ValueError(f"protocollo auth dev'essere uno fra {', '.join(SNMP_AUTH_PROTOCOLS)}")
+        return v
+
+    @field_validator("priv_protocol", mode="before")
+    @classmethod
+    def _v_priv(cls, v):
+        v = str(v or "AES").strip().upper()
+        if v not in SNMP_PRIV_PROTOCOLS:
+            raise ValueError(f"protocollo priv dev'essere uno fra {', '.join(SNMP_PRIV_PROTOCOLS)}")
+        return v
+
+    @model_validator(mode="after")
+    def _v_user(self):
+        if self.version == "3" and not self.user.strip():
+            raise ValueError(f"profilo SNMP {self.name}: con la versione 3 serve l'utente")
+        return self
+
+
+class SNMPHost(BaseModel):
+    """Un host da interrogare via SNMP, con il profilo di credenziali da usare."""
+    ip: str
+    profile: str = "default"
+
+    @field_validator("ip", mode="before")
+    @classmethod
+    def _v_ip(cls, v):
+        v = str(v or "").strip()
+        try:
+            ipaddress.ip_address(v)
+        except ValueError:
+            raise ValueError(f"host SNMP: serve un indirizzo IP, ricevuto {v!r}")
+        return v
+
+    @field_validator("profile", mode="before")
+    @classmethod
+    def _v_profile(cls, v):
+        return str(v or "default").strip().lower()
+
+
+def _snmp_hosts(v):
+    """`hosts` accetta sia IP semplici sia oggetti {ip, profile}."""
+    return [{"ip": x} if isinstance(x, (str, int)) else x for x in (v or [])]
+
+
+class SNMPDiscovery(BaseModel):
+    """Device che parlano SNMP (switch, AP, stampanti, NAS): discovery,
+    dettagli e traffico per interfaccia, topologia LLDP/FDB."""
+    enabled: bool = False
+    # Credenziali del profilo `default` quando `profiles` non lo definisce.
+    # Compatibilita' con la configurazione precedente ai profili: la community
+    # andrebbe pero' messa nei segreti (snmp_default_community).
+    community: str = ""
+    version: str = "2c"
+    profiles: list[SNMPProfile] = []
+    hosts: list[SNMPHost] = []        # interrogati sempre, con il loro profilo
+    # Prova SNMP (profilo default) anche sugli host online trovati dallo scan.
+    autodiscover: bool = True
+    exclude: list[str] = []           # IP da non interrogare mai
+    timeout: int = 2                  # secondi per richiesta
+    retries: int = 1
+    concurrency: int = 8              # host interrogati in parallelo
+    interfaces: bool = True           # tabella interfacce nei dettagli
+    traffic: bool = True              # banda per interfaccia + storico
+    traffic_interval: int = 30        # secondi fra due letture dei contatori
+    topology: bool = True             # LLDP + tabella FDB per la mappa
+
+    _v_profiles = field_validator("profiles", mode="before")(_none_to_list)
+    _v_hosts = field_validator("hosts", mode="before")(_snmp_hosts)
+    _v_exclude = field_validator("exclude", mode="before")(_none_to_list)
+
+    @field_validator("version", mode="before")
+    @classmethod
+    def _v_version(cls, v):
+        v = _snmp_version(v)
+        if v == "3":
+            # La v3 vuole utente e protocolli: un campo solo non basta a
+            # descriverla, ed e' proprio quello che fanno i profili.
+            raise ValueError("SNMPv3: definisci un profilo in `profiles` "
+                             "(il campo `version` vale solo per 1 e 2c)")
+        return v
+
+    @model_validator(mode="after")
+    def _v_coerenza(self):
+        nomi = [p.name for p in self.profiles]
+        doppi = sorted({n for n in nomi if nomi.count(n) > 1})
+        if doppi:
+            raise ValueError(f"profili SNMP duplicati: {', '.join(doppi)}")
+        noti = set(nomi) | {"default"}
+        for h in self.hosts:
+            if h.profile not in noti:
+                raise ValueError(f"host SNMP {h.ip}: profilo '{h.profile}' non definito")
+        if self.timeout < 1 or self.retries < 0 or self.concurrency < 1:
+            raise ValueError("SNMP: timeout >= 1, retries >= 0, concurrency >= 1")
+        if self.traffic_interval < 5:
+            raise ValueError("SNMP: traffic_interval minimo 5 secondi")
+        return self
+
+    def all_profiles(self) -> list[SNMPProfile]:
+        """Profili definiti piu' il `default`, ricavato dai campi storici se manca."""
+        out = list(self.profiles)
+        if not any(p.name == "default" for p in out):
+            out.insert(0, SNMPProfile(name="default", version=self.version))
+        return out
+
+    def profile(self, name: str) -> SNMPProfile:
+        for p in self.all_profiles():
+            if p.name == name:
+                return p
+        raise KeyError(name)
 
 
 class ReverseDNSDiscovery(BaseModel):

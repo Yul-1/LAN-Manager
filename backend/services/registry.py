@@ -42,6 +42,9 @@ class Device:
     # Interfacce di rete dell'host, quando raggiungibile via SSH (facts).
     # Vuoto per tutti gli altri: e' un dato che non abbiamo, non uno zero.
     interfaces: list[dict] = field(default_factory=list)
+    # Riassunto SNMP (sistema, profilo) quando il device risponde a SNMP; le
+    # interfacce con la banda stanno nello snapshot `snmp`, aggiornato dal poller.
+    snmp: dict = field(default_factory=dict)
     # Gestione manuale
     hidden: bool = False      # nascosto dall'utente (resta escluso anche se ri-scoperto)
     # Stato live
@@ -104,6 +107,7 @@ class Device:
             "open_ports": self.open_ports,
             "discovered_by": self.discovered_by,
             "interfaces": self.interfaces,
+            "snmp": self.snmp,
             "hidden": self.hidden,
             "key": self.key,
             "online": self.online,

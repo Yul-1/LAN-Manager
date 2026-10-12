@@ -100,6 +100,7 @@ _SINGLETONS = (
     "services.scanner:_scanner",
     "services.secrets_store:_store",
     "services.service_store:_store",
+    "services.snmp:_state",
     "services.systemd_monitor:_monitor",
     "services.wireguard:_wg_service",
     "services.windows_services:_monitor",

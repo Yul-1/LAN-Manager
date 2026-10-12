@@ -30,7 +30,10 @@ log = logging.getLogger("config-store")
 # SNMP e' a tutti gli effetti la password dei dispositivi SNMP (pentest
 # 2026-09-24, G7): oggi e' "public", ma il giorno che la si cambia non deve
 # essere leggibile da chiunque abbia una sessione.
-SECRET_KEYS = {"password", "luci_password", "password_hash", "community"}
+# Le passphrase SNMPv3 non dovrebbero mai stare in config.yaml (vanno nei
+# segreti), ma se qualcuno ce le scrive non devono uscire in chiaro.
+SECRET_KEYS = {"password", "luci_password", "password_hash", "community",
+               "auth_password", "priv_password"}
 MASK = "********"
 
 # Campi che identificano un elemento di lista (es. un host), per ripristinare i
@@ -121,6 +124,7 @@ EDITABLE_SECTIONS = {
     "subnets": "subnets",
     "wg_peers": "wireguard.peer_names",
     "discovery_ssh": "discovery.ssh",
+    "discovery_snmp": "discovery.snmp",
     "docker_hosts": "docker.hosts",
     "alerts_silenced": "alerts.silenced",
 }

@@ -6,7 +6,7 @@ scegliendo il metodo per ciascuno:
   - docker  : container "pinnato" (etichetta/URL su un container scoperto)
   - systemd : unit dell'host (stato via SSH)
   - windows : servizio Windows su un host della LAN (stato via SSH/PowerShell)
-  - http    : healthcheck con type http | tcp | ping
+  - http    : healthcheck con type http | tcp | ping | snmp
 
 Struttura del file:
     docker:  { pinned:   [ {name, label, url}, ... ] }

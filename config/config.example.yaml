@@ -421,12 +421,39 @@ discovery:
       #   user: "winuser"     # the Windows user, not the one of the Linux servers
       #   os: "windows"
 
-  # SNMP: for devices that expose it (APs, switches, printers).
+  # SNMP: for devices that expose it (switches, APs, printers, NAS).
+  # Provides name/description/uptime, interfaces with bandwidth (and history),
+  # LLDP neighbours and the switch port every device is plugged into.
+  # Credentials have a name (profile); the SECRETS (community, v3 passphrases)
+  # do NOT go here but in the secrets: Settings -> Secrets, one entry per
+  # profile (e.g. "SNMP community (profile default)").
   snmp:
     enabled: false
-    community: "public"
-    version: "2c"             # 1 | 2c
-    hosts: []                 # e.g. ["192.0.2.2", "192.0.2.50"]
+    # The "default" profile always exists: if you do not define it, it is v2c.
+    # Prefer v3 with authPriv: v1/v2c send the community in clear text.
+    profiles: []
+    #  - name: default
+    #    version: "2c"          # 1 | 2c | 3
+    #  - name: switch
+    #    version: "3"
+    #    user: "lanmng"
+    #    level: authPriv        # noAuthNoPriv | authNoPriv | authPriv
+    #    auth_protocol: SHA     # MD5 | SHA | SHA-224 | SHA-256 | SHA-384 | SHA-512
+    #    priv_protocol: AES     # DES | AES | AES-192 | AES-256
+    # Hosts always queried: an IP (default profile) or {ip, profile}.
+    hosts: []
+    #  - "192.0.2.50"
+    #  - { ip: "192.0.2.2", profile: switch }
+    # Also try SNMP (default profile) on the live hosts found by the scan.
+    autodiscover: true
+    exclude: []               # IPs never to query
+    timeout: 2                # seconds per request
+    retries: 1
+    concurrency: 8            # hosts in parallel
+    interfaces: true          # interface table in the device card
+    traffic: true             # per-interface bandwidth + chart history
+    traffic_interval: 30      # seconds between two counter reads (min 5)
+    topology: true            # LLDP + FDB table: who is plugged into which port
 
   # Reverse DNS: resolves host names via PTR using the system resolver
   # (which on the LAN is the router/dnsmasq, so it covers .lan names too).

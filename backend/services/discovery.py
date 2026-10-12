@@ -30,6 +30,7 @@ import re
 import shutil
 import socket
 import time
+from typing import Optional
 
 from config import settings
 from services.errors import exc_text, ssh_error
@@ -620,40 +621,142 @@ def _parse_facts(stdout: str) -> dict:
 # ── SNMP ───────────────────────────────────────────────────────────
 
 class SNMPProvider(DiscoveryProvider):
+    """Host che parlano SNMP: sistema, indirizzi, vicini LLDP, tabella FDB.
+
+    Bersagli: gli host scritti in config (sempre, con il loro profilo) e, con
+    `autodiscover`, gli host accesi dello scan che stanno nelle subnet da
+    scansionare. Questi ultimi si sondano prima con una richiesta breve e
+    senza ripetizioni: la gran parte della rete non parla SNMP e aspettare il
+    timeout pieno per ciascuno allungherebbe lo scan di decine di secondi.
+    Il risultato va in `services/snmp.get_snmp()`, da cui legge il poller
+    della banda; sul Device resta il riassunto per la scheda dettagli.
+    """
     name = "snmp"
 
+    def __init__(self):
+        self._ultimo_avviso = ""
+
     async def run(self, registry: DeviceRegistry) -> None:
+        from services.snmp import SnmpError, SnmpUnavailable, get_snmp
         cfg = settings.discovery.snmp
         if not cfg.enabled:
             return
+        state = get_snmp()
         if not shutil.which("snmpget"):
             log.warning("snmpget (net-snmp) non installato: provider snmp saltato")
+            state.set_discovered([])
             return
 
-        for ip in cfg.hosts:
-            info = await self._query(ip, cfg)
-            if info:
-                self._apply(registry, ip, info)
+        esclusi = set(cfg.exclude)
+        espliciti = {h.ip: h.profile for h in cfg.hosts if h.ip not in esclusi}
+        candidati: list[str] = []
+        autodiscover = cfg.autodiscover
+        if autodiscover:
+            try:
+                state.client.check_profile("default")
+            except SnmpUnavailable as e:
+                # Una volta sola finche' il motivo non cambia: ripeterlo a ogni
+                # giro lento riempirebbe il log della stessa riga ogni minuto.
+                if str(e) != self._ultimo_avviso:
+                    log.warning(f"snmp autodiscover sospeso: {e}")
+                    self._ultimo_avviso = str(e)
+                autodiscover = False
+            else:
+                self._ultimo_avviso = ""
+        if autodiscover:
+            for dev in registry.all():
+                for ip in dev.ips:
+                    if (dev.online and ip not in espliciti and ip not in esclusi
+                            and _in_scan_subnets(ip)):
+                        candidati.append(ip)
 
-    async def _query(self, ip: str, cfg) -> dict:
-        # sysName.0 e sysDescr.0
-        args = ["snmpget", "-v", cfg.version, "-c", cfg.community, "-Ovq",
-                ip, "1.3.6.1.2.1.1.5.0", "1.3.6.1.2.1.1.1.0"]
-        out = await _run_cmd(args, timeout=10)
-        lines = [l.strip().strip('"') for l in out.splitlines() if l.strip()]
-        if not lines:
-            return {}
-        return {"name": lines[0] if lines else "",
-                "descr": lines[1] if len(lines) > 1 else ""}
+        async def sonda(ip: str) -> Optional[str]:
+            try:
+                await state.client.get(ip, ["1.3.6.1.2.1.1.2.0"], "default",
+                                       timeout=1, retries=0)
+                return ip
+            except SnmpUnavailable as e:
+                log.warning(f"snmp autodiscover: {e}")
+            except SnmpError:
+                pass
+            return None
+
+        rispondenti = [ip for ip in await asyncio.gather(*[sonda(ip) for ip in candidati])
+                       if ip]
+        bersagli = dict(espliciti)
+        bersagli.update({ip: "default" for ip in rispondenti})
+        risultati = await asyncio.gather(*[self._leggi(state.client, ip, prof)
+                                           for ip, prof in sorted(bersagli.items())])
+        for r in risultati:
+            if r.reachable:
+                self._apply(registry, r)
+        # Il riassunto SNMP sopravvive fra uno scan e l'altro (carry-over in
+        # scanner.py): un device che ha smesso di rispondere lo perde qui,
+        # invece di mostrare per sempre i dati dell'ultima volta.
+        rispondono = {r.ip for r in risultati if r.reachable}
+        for dev in registry.all():
+            if dev.snmp and not rispondono.intersection(dev.ips):
+                dev.snmp = {}
+        state.set_discovered(list(risultati))
+        log.info(f"snmp: {sum(r.reachable for r in risultati)}/{len(risultati)} host "
+                 f"rispondono ({len(candidati)} sondati in autodiscover)")
 
     @staticmethod
-    def _apply(registry: DeviceRegistry, ip: str, info: dict):
-        dev = registry.find_by_ip(ip) or registry.upsert(ip=ip, source="snmp")
-        if info.get("name") and not dev.hostname:
-            dev.hostname = info["name"]
-        if info.get("descr") and not dev.os_guess:
-            dev.os_guess = info["descr"][:80]
+    async def _leggi(client, ip: str, profile: str):
+        from services.snmp import (SnmpError, SnmpHostData, build_ip_addresses,
+                                   IP_ADDR_IFINDEX, read_interfaces, read_system,
+                                   read_topology)
+        cfg = settings.discovery.snmp
+        r = SnmpHostData(ip=ip, profile=profile, discovered_at=int(time.time()))
+        try:
+            r.system = await read_system(client, ip, profile)
+            r.reachable = True
+            try:
+                r.ip_addresses = build_ip_addresses(
+                    await client.walk(ip, IP_ADDR_IFINDEX, profile))
+            except SnmpError as e:
+                log.debug(f"snmp {ip}: ipAddrTable non disponibile ({e})")
+            if cfg.topology:
+                # I nomi delle porte servono a dire "porta 5" invece di un indice.
+                ifaces = await read_interfaces(client, ip, profile)
+                r.interfaces = ifaces
+                r.lldp, r.fdb = await read_topology(
+                    client, ip, profile, {i["index"]: i["name"] for i in ifaces})
+        except SnmpError as e:
+            # Un host scritto in config che non risponde va detto: e' una
+            # configurazione da correggere o un device spento, non un silenzio.
+            log.warning(f"snmp {ip}: {e}")
+            r.reachable, r.error = False, str(e)
+        except Exception as e:
+            log.error(f"snmp {ip}: {exc_text(e)}")
+            r.reachable, r.error = False, exc_text(e)[:200]
+        return r
+
+    @staticmethod
+    def _apply(registry: DeviceRegistry, r) -> None:
+        dev = registry.find_by_ip(r.ip) or registry.upsert(ip=r.ip, source="snmp")
+        sysinfo = r.system
+        if sysinfo.get("name") and not dev.hostname:
+            dev.hostname = sysinfo["name"]
+        if sysinfo.get("descr") and not dev.os_guess:
+            dev.os_guess = sysinfo["descr"][:80]
+        dev.snmp = {**sysinfo, "profile": r.profile, "lldp": len(r.lldp),
+                    "fdb": len(r.fdb)}
         dev.tag_source("snmp")
+
+
+def _in_scan_subnets(ip: str) -> bool:
+    try:
+        addr = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    for cidr in settings.scan_subnets:
+        try:
+            if addr in ipaddress.ip_network(cidr, strict=False):
+                return True
+        except ValueError:
+            continue
+    return False
 
 
 # ── Helper ─────────────────────────────────────────────────────────

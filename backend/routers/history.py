@@ -51,6 +51,16 @@ async def resources_history(host: str = Query(..., min_length=1, max_length=64),
     return {"period": period, "from": da, "host": host, "points": punti}
 
 
+@router.get("/interface")
+async def interface_history(host: str = Query(..., min_length=1, max_length=64),
+                            ifname: str = Query(..., min_length=1, max_length=64),
+                            period: str = Query("24h")):
+    """Banda storica di un'interfaccia letta via SNMP (bit/s, come la WAN)."""
+    da = _finestra(period)
+    punti = await asyncio.to_thread(get_history().iface_series, host, ifname, da)
+    return {"period": period, "from": da, "host": host, "ifname": ifname, "points": punti}
+
+
 @router.get("/device")
 async def device_history(key: str = Query(..., min_length=1, max_length=64),
                          period: str = Query("24h")):

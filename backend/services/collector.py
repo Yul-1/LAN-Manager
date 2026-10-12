@@ -25,6 +25,7 @@ from services.history_store import get_history
 from services.host_metrics import get_host_metrics
 from services.scanner import get_scanner
 from services.services_overview import build_services_overview
+from services.snmp import build_topology, community_in_yaml_warning, get_snmp
 
 log = logging.getLogger("collector")
 
@@ -39,6 +40,9 @@ class DataCollector:
         # La raccolta lenta gira in un task a parte: se restasse inline
         # bloccherebbe anche gli update fast per tutta la durata dello scan.
         self._slow_task: Optional[asyncio.Task] = None
+        # Lettura SNMP delle interfacce: task a parte per lo stesso motivo,
+        # un agente lento non deve ritardare gli update fast.
+        self._snmp_task: Optional[asyncio.Task] = None
         # Ultima lettura dei contatori WAN, per derivare i bit/s.
         self._last_wan: Optional[dict] = None
         # Serializza la raccolta iniziale: piu' client WS che si connettono
@@ -278,6 +282,26 @@ class DataCollector:
             "offline": sum(1 for d in devices if not d.online),
             "ts": int(time.time()),
         }
+        self._store_snmp()
+
+    def _store_snmp(self):
+        """Host SNMP e topologia nello snapshot. La topologia si ricalcola qui
+        perche' dipende sia dai device (MAC, chiavi) sia dai dati SNMP, e
+        questo e' il punto dove i device cambiano."""
+        cfg = settings.discovery.snmp
+        if not cfg.enabled:
+            self._snapshot.pop("snmp", None)
+            self._snapshot["topology"] = []
+            return
+        state = get_snmp()
+        self._snapshot["snmp"] = state.snapshot()
+        try:
+            self._snapshot["topology"] = (build_topology(state.topology_input(),
+                                                         self._snapshot.get("devices", []))
+                                          if cfg.topology else [])
+        except Exception as e:
+            log.error(f"topologia snmp: {exc_text(e)}")
+            self._snapshot["topology"] = []
 
     async def _collect_devices(self):
         try:
@@ -459,6 +483,33 @@ class DataCollector:
         return (round((rx - prev["rx"]) * 8 / elapsed, 1),
                 round((tx - prev["tx"]) * 8 / elapsed, 1))
 
+    def _start_snmp(self):
+        """Avvia la lettura SNMP delle interfacce se e' il momento e se non ne
+        gira gia' una (un agente che non risponde costa il timeout pieno)."""
+        if not get_snmp().due():
+            return
+        if self._snmp_task and not self._snmp_task.done():
+            return
+        self._snmp_task = asyncio.create_task(self._poll_snmp())
+        self._snmp_task.add_done_callback(_log_task_error)
+
+    async def _poll_snmp(self):
+        state = get_snmp()
+        try:
+            punti = await state.poll()
+            self._snapshot["snmp"] = state.snapshot()
+            if punti:
+                await asyncio.to_thread(get_history().add_iface_points, punti)
+            if any(h.reachable for h in state.hosts.values()):
+                self._sorgente_ok("snmp")
+            else:
+                errori = {h.error for h in state.hosts.values() if h.error}
+                self._sorgente_ko("snmp", RuntimeError(
+                    "; ".join(sorted(errori))[:300] or "nessun host SNMP risponde"))
+        except Exception as e:
+            log.error(f"poll snmp: {exc_text(e)}")
+            self._sorgente_ko("snmp", e)
+
     async def _collect_fast(self):
         # meta statico (nomi/colori subnet, nome router) per la UI: nessun hardcoded lato frontend.
         self._snapshot["meta"] = _build_meta()
@@ -469,6 +520,7 @@ class DataCollector:
             return_exceptions=True,
         )
         await self._collect_traffic_point()
+        self._start_snmp()
         await self._archivia_log()
         self._aggiorna_alert()
 
@@ -544,6 +596,9 @@ class DataCollector:
         # degli scan manuali): senza questo aggancio la UI li vedrebbe solo al
         # ciclo slow successivo.
         get_scanner().on_result = self.publish_devices
+        avviso = community_in_yaml_warning()
+        if avviso:
+            log.warning(avviso)
         while True:
             now = time.time()
             try:

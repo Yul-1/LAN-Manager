@@ -28,6 +28,40 @@ SECRET_FIELDS = [
 ]
 _BY_ID = {f["id"]: f for f in SECRET_FIELDS}
 
+# Segreti SNMP: una voce per profilo di credenziali (discovery.snmp.profiles),
+# quindi l'elenco dipende dalla configurazione caricata. Le variabili non
+# corrispondono a nessun campo di Settings (pydantic le ignora): le legge solo
+# services/snmp.py, a runtime, con snmp_secret().
+_SNMP_KINDS = {
+    "community": "community SNMP",
+    "auth":      "passphrase auth SNMPv3",
+    "priv":      "passphrase priv SNMPv3",
+}
+
+
+def snmp_secret_env(profile: str, kind: str) -> str:
+    return f"LAN_SNMP_SECRET_{profile.upper()}_{kind.upper()}"
+
+
+def _snmp_fields() -> list[dict]:
+    """Voci SNMP per i profili configurati: solo quelle che il profilo usa."""
+    from config import settings     # import qui: config non deve dipendere da noi
+    out = []
+    for p in settings.discovery.snmp.all_profiles():
+        if p.version == "3":
+            kinds = ([] if p.level == "noAuthNoPriv" else ["auth"]) + \
+                    (["priv"] if p.level == "authPriv" else [])
+        else:
+            kinds = ["community"]
+        for k in kinds:
+            out.append({"id": f"snmp_{p.name}_{k}", "env": snmp_secret_env(p.name, k),
+                        "label": f"{_SNMP_KINDS[k].capitalize()} (profilo {p.name})"})
+    return out
+
+
+def _fields() -> list[dict]:
+    return SECRET_FIELDS + _snmp_fields()
+
 
 def _env_path() -> Path:
     return Path(os.environ.get("LAN_ENV_FILE", _default_path()))
@@ -70,7 +104,7 @@ class SecretsStore:
         current = self._read()
         return [
             {"id": f["id"], "label": f["label"], "set": bool(current.get(f["env"]))}
-            for f in SECRET_FIELDS
+            for f in _fields()
         ]
 
     # ── Scrittura ──────────────────────────────────────────────────
@@ -83,14 +117,15 @@ class SecretsStore:
         # Un id sconosciuto era ignorato con un 200 `changed: []`: chi usava il
         # nome della variabile d'ambiente al posto dell'id credeva di aver
         # salvato. Si rifiuta tutto prima di scrivere, cosi' non resta a meta'.
-        sconosciuti = sorted(k for k in values if k not in _BY_ID)
+        by_id = {f["id"]: f for f in _fields()}
+        sconosciuti = sorted(k for k in values if k not in by_id)
         if sconosciuti:
             raise ValueError(f"segreti sconosciuti: {', '.join(sconosciuti)} "
-                             f"(ammessi: {', '.join(_BY_ID)})")
+                             f"(ammessi: {', '.join(by_id)})")
         current = self._read()
         changed = []
         for fid, val in values.items():
-            field = _BY_ID[fid]
+            field = by_id[fid]
             if val is None:
                 continue
             env = field["env"]
@@ -180,6 +215,19 @@ def _dotenv_unquote(v: str) -> str:
                 i += 1
         return "".join(out)
     return v
+
+
+def snmp_secret(profile: str, kind: str) -> str:
+    """Segreto SNMP di un profilo per uso INTERNO (mai esposto via API).
+
+    Letto a ogni uso, come l'hash admin: un segreto cambiato dalla UI vale dal
+    giro successivo. Per la community del profilo `default` resta valido il
+    vecchio `discovery.snmp.community` di config.yaml, come ultima risorsa."""
+    val = get_secrets_store().value(snmp_secret_env(profile, kind))
+    if not val and profile == "default" and kind == "community":
+        from config import settings
+        val = settings.discovery.snmp.community
+    return val
 
 
 _store: SecretsStore | None = None

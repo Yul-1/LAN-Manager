@@ -41,6 +41,7 @@ log = logging.getLogger("history")
 # le medie sulla colonna sbagliata.
 _TRAFFIC_COLS = ("rx_bps", "tx_bps", "latency")
 _HOST_COLS = ("cpu", "mem", "swap", "load1", "temp")
+_IFACE_COLS = ("rx_bps", "tx_bps")
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS traffic (
@@ -61,6 +62,16 @@ CREATE TABLE IF NOT EXISTS host_metrics (
     temp  REAL,
     span  INTEGER NOT NULL DEFAULT 0,
     PRIMARY KEY (host, t)
+);
+
+CREATE TABLE IF NOT EXISTS iface_traffic (
+    host   TEXT    NOT NULL,
+    ifname TEXT    NOT NULL,
+    t      INTEGER NOT NULL,
+    rx_bps REAL,
+    tx_bps REAL,
+    span   INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (host, ifname, t)
 );
 
 CREATE TABLE IF NOT EXISTS device_events (
@@ -243,6 +254,19 @@ class HistoryStore:
                 "INSERT OR IGNORE INTO host_metrics (host, t, cpu, mem, swap, load1, temp, span) "
                 "VALUES (?, ?, ?, ?, ?, ?, ?, 0)", righe)
 
+    def add_iface_points(self, points: dict[str, list[dict]]) -> None:
+        """Banda per interfaccia dei device SNMP: {ip: [{ifname, rx_bps, tx_bps}]}.
+        Come per il traffico WAN, un None resta None (buco onesto)."""
+        if self._db is None or not points:
+            return
+        t = _ms()
+        righe = [(ip, str(p.get("ifname") or "")[:64], t, *(p.get(c) for c in _IFACE_COLS))
+                 for ip, lista in points.items() for p in lista if p.get("ifname")]
+        if righe:
+            self._write(
+                "INSERT OR IGNORE INTO iface_traffic (host, ifname, t, rx_bps, tx_bps, span) "
+                "VALUES (?, ?, ?, ?, ?, 0)", righe)
+
     def mark_devices(self, devices: list[dict]) -> None:
         """Registra i soli cambi di stato online/offline."""
         if self._db is None or not devices:
@@ -310,6 +334,12 @@ class HistoryStore:
         return self._campioni("host_metrics", _HOST_COLS, since_ms, max_points,
                               passo_ms=settings.host_metrics.interval * 1000,
                               dove="host = ?", args=(host,))
+
+    def iface_series(self, host: str, ifname: str, since_ms: int,
+                     max_points: int = 0) -> list[dict]:
+        return self._campioni("iface_traffic", _IFACE_COLS, since_ms, max_points,
+                              passo_ms=settings.discovery.snmp.traffic_interval * 1000,
+                              dove="host = ? AND ifname = ?", args=(host, ifname))
 
     def _campioni(self, tabella: str, colonne: tuple, since_ms: int,
                   max_points: int, passo_ms: int,
@@ -484,8 +514,11 @@ class HistoryStore:
             with self._lock, self._db:
                 self._aggrega("traffic", _TRAFFIC_COLS, ("t",), soglia, span)
                 self._aggrega("host_metrics", _HOST_COLS, ("host", "t"), soglia, span)
+                self._aggrega("iface_traffic", _IFACE_COLS, ("host", "ifname", "t"),
+                              soglia, span)
                 self._db.execute("DELETE FROM traffic WHERE t < ?", (scadenza,))
                 self._db.execute("DELETE FROM host_metrics WHERE t < ?", (scadenza,))
+                self._db.execute("DELETE FROM iface_traffic WHERE t < ?", (scadenza,))
                 self._potatura_eventi(scadenza)
                 self._potatura_log(ora)
         except sqlite3.Error as e:
@@ -502,14 +535,16 @@ class HistoryStore:
         per bucket. `span` sulla riga dice quanti secondi copre, cosi' chi legge
         sa che e' una media e il volume si puo' ancora ricavare (bit/s * span)."""
         assert self._db is not None
-        gruppo = ", ".join(("host",) if "host" in chiave else ()) or None
-        campi = ("host, " if gruppo else "") + "t, " + ", ".join(colonne) + ", span"
+        # Le colonne di raggruppamento sono quelle della chiave tranne `t`
+        # (host per le risorse, host+interfaccia per la banda SNMP).
+        gruppo = "".join(f"{c}, " for c in chiave if c != "t")
+        campi = gruppo + "t, " + ", ".join(colonne) + ", span"
         medie = ", ".join(f"AVG({c})" for c in colonne)
         self._db.execute(
             f"INSERT OR REPLACE INTO {tabella} ({campi}) "
-            f"SELECT {'host, ' if gruppo else ''}(t / ?) * ?, {medie}, ? "
+            f"SELECT {gruppo}(t / ?) * ?, {medie}, ? "
             f"FROM {tabella} WHERE span = 0 AND t < ? "
-            f"GROUP BY {'host, ' if gruppo else ''}t / ?",
+            f"GROUP BY {gruppo}t / ?",
             (span, span, span // 1000, soglia, span))
         self._db.execute(f"DELETE FROM {tabella} WHERE span = 0 AND t < ?", (soglia,))
 

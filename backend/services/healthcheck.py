@@ -4,6 +4,8 @@ services/healthcheck.py — Healthcheck HTTP / porte TCP
 Probe periodici sui servizi definiti in services.yaml (sezione http):
   - type: http  -> GET sull'URL, ok se lo status code e' fra expect_status
   - type: tcp   -> prova ad aprire host:port, ok se la connessione riesce
+  - type: ping  -> host raggiungibile
+  - type: snmp  -> legge un OID e lo confronta (op: responds|eq|ne|gt|lt|contains)
 """
 from __future__ import annotations
 
@@ -25,8 +27,8 @@ log = logging.getLogger("healthcheck")
 @dataclass
 class CheckResult:
     name: str
-    type: str            # http | tcp
-    target: str          # url o host:port
+    type: str            # http | tcp | ping | snmp
+    target: str          # url, host:port, host o "host OID"
     ok: bool
     latency_ms: float
     detail: str
@@ -67,7 +69,34 @@ class HealthChecker:
             return await self._tcp(c)
         if t == "ping":
             return await self._ping(c)
+        if t == "snmp":
+            return await self._snmp(c)
         return await self._http(c)
+
+    async def _snmp(self, c: dict) -> CheckResult:
+        from services.snmp import SnmpError, get_snmp, valid_host, valid_oid
+        host, profile = c.get("host", ""), c.get("profile") or "default"
+        try:
+            valid_host(host)
+            oid = valid_oid(c.get("oid", ""))
+        except ValueError as e:
+            return _result(c, ok=False, latency_ms=0.0, detail=str(e))
+        if await target_blocked(host):
+            return _result(c, ok=False, latency_ms=0.0, detail="target non consentito")
+        start = time.perf_counter()
+        try:
+            valori = await get_snmp().client.get(host, [oid], profile)
+        except SnmpError as e:
+            latency = (time.perf_counter() - start) * 1000
+            return _result(c, ok=False, latency_ms=latency, detail=str(e)[:200])
+        latency = (time.perf_counter() - start) * 1000
+        letto = valori.get(oid)
+        if letto is None:
+            return _result(c, ok=False, latency_ms=latency,
+                           detail="l'agente non espone questo OID")
+        ok, detail = snmp_condition(letto[1], c.get("op") or "responds",
+                                    str(c.get("value", "")))
+        return _result(c, ok=ok, latency_ms=latency, detail=detail)
 
     async def _ping(self, c: dict) -> CheckResult:
         from services.ping import ping_host
@@ -126,8 +155,37 @@ class HealthChecker:
             return _result(c, ok=False, latency_ms=latency, detail=exc_text(e)[:200])
 
 
+SNMP_OPS = ("responds", "eq", "ne", "gt", "lt", "contains")
+
+
+def snmp_condition(valore, op: str, atteso: str) -> tuple[bool, str]:
+    """Confronta il valore letto con la condizione del servizio.
+
+    gt/lt solo fra numeri: un confronto fra testi ("10" < "9") darebbe un
+    esito che sembra giusto ed e' sbagliato, quindi si rifiuta dicendolo."""
+    from services.snmp import text
+    letto = valore if isinstance(valore, int) else text(valore)
+    mostrato = str(letto)[:80]
+    if op == "responds":
+        return True, f"valore {mostrato}"
+    if op in ("eq", "ne"):
+        uguale = str(letto).strip() == atteso.strip()
+        return (uguale if op == "eq" else not uguale), f"valore {mostrato}"
+    if op == "contains":
+        return atteso in str(letto), f"valore {mostrato}"
+    if op in ("gt", "lt"):
+        try:
+            a, b = float(letto), float(atteso)
+        except (TypeError, ValueError):
+            return False, f"confronto numerico impossibile: valore {mostrato}"
+        return (a > b if op == "gt" else a < b), f"valore {mostrato}"
+    return False, f"condizione sconosciuta: {op}"
+
+
 def _target(c: dict) -> str:
     t = c.get("type")
+    if t == "snmp":
+        return f"{c.get('host', '')} {c.get('oid', '')}"
     if t == "tcp":
         return f"{c.get('host','')}:{c.get('port','')}"
     if t == "ping":

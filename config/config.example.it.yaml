@@ -404,12 +404,39 @@ discovery:
       #   user: "winuser"     # l'utente Windows, non quello dei server Linux
       #   os: "windows"
 
-  # SNMP: per device che lo espongono (AP, switch, stampanti).
+  # SNMP: per device che lo espongono (switch, AP, stampanti, NAS).
+  # Da' nome/descrizione/uptime, le interfacce con la banda (e lo storico),
+  # i vicini LLDP e la porta dello switch a cui e' collegato ogni device.
+  # Le credenziali hanno un nome (profilo); i SEGRETI (community, passphrase
+  # v3) NON vanno qui ma nei segreti: Impostazioni -> Segreti, una voce per
+  # profilo (es. "Community SNMP (profilo default)").
   snmp:
     enabled: false
-    community: "public"
-    version: "2c"             # 1 | 2c
-    hosts: []                 # es. ["192.0.2.2", "192.0.2.50"]
+    # Il profilo "default" esiste sempre: se non lo definisci e' v2c.
+    # Meglio la v3 con authPriv: v1/v2c mandano la community in chiaro.
+    profiles: []
+    #  - name: default
+    #    version: "2c"          # 1 | 2c | 3
+    #  - name: switch
+    #    version: "3"
+    #    user: "lanmng"
+    #    level: authPriv        # noAuthNoPriv | authNoPriv | authPriv
+    #    auth_protocol: SHA     # MD5 | SHA | SHA-224 | SHA-256 | SHA-384 | SHA-512
+    #    priv_protocol: AES     # DES | AES | AES-192 | AES-256
+    # Host interrogati sempre: un IP (profilo default) o {ip, profile}.
+    hosts: []
+    #  - "192.0.2.50"
+    #  - { ip: "192.0.2.2", profile: switch }
+    # Prova SNMP (profilo default) anche sugli host accesi trovati dallo scan.
+    autodiscover: true
+    exclude: []               # IP da non interrogare mai
+    timeout: 2                # secondi per richiesta
+    retries: 1
+    concurrency: 8            # host in parallelo
+    interfaces: true          # tabella interfacce nella scheda del device
+    traffic: true             # banda per interfaccia + storico dei grafici
+    traffic_interval: 30      # secondi fra due letture dei contatori (min 5)
+    topology: true            # LLDP + tabella FDB: chi e' collegato a quale porta
 
   # Reverse DNS: risolve gli hostname via PTR usando il resolver di sistema
   # (che sulla LAN e' il router/dnsmasq, quindi copre anche i nomi .lan).

@@ -174,6 +174,9 @@ class DeviceScanner:
             # evita che la scheda dettagli si svuoti fra uno scan e l'altro.
             if not dev.open_ports and precedente.open_ports:
                 dev.open_ports = list(precedente.open_ports)
+            # Stesso discorso per il riassunto SNMP, che arriva solo a stage lento.
+            if not dev.snmp and precedente.snmp:
+                dev.snmp = dict(precedente.snmp)
 
     # ── Ciclo completo ─────────────────────────────────────────────
 
