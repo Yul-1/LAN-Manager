@@ -7,8 +7,8 @@ piccolo ufficio. Gira in Docker, e' raggiungibile **solo dalla rete privata**, e
 pensata per essere configurata dalla sua stessa interfaccia web invece che
 modificando file.
 
-> **Versione 1.2.1** — release di sicurezza: audit del terminale, strumenti di rete e
-> gestione delle sessioni piu' rigorosi. HTTPS con un nginx tuo dalla 1.2.0.
+> **Versione 1.3.0** — SNMP: dettagli dei dispositivi, banda per interfaccia con
+> storico, topologia delle porte dello switch sulla mappa e un controllo `snmp` per i servizi.
 > Vedi [CHANGELOG.md](CHANGELOG.md).
 
 ## Cosa fa
@@ -21,12 +21,15 @@ modificando file.
 - **Discovery** — lease DHCP e tabella ARP dal router, piu' ping sweep, nmap,
   reverse DNS, informazioni raccolte via SSH e SNMP. Ogni sorgente e' un provider a
   se': se una fallisce, le altre continuano.
+- **SNMP** — switch, access point, stampanti e NAS: interfacce con banda e storico,
+  vicini LLDP e la porta dello switch a cui e' collegato ogni dispositivo. Le credenziali
+  sono profili con un nome (v1/v2c/v3) e i segreti non passano mai dalla riga di comando.
 - **Mappa interattiva** — la rete disegnata come un grafo, con spostamento, zoom e
   nodi riposizionabili.
 - **Traffico e WAN** — contatori e velocita' delle interfacce da un router OpenWrt,
   piu' lo stato del collegamento a internet (cablato, 4G, tethering).
 - **Servizi** — per ogni servizio si sceglie **come** monitorarlo (container Docker,
-  ping, porta TCP, stato HTTP, unit systemd) e **dove**, anche su altri host della
+  ping, porta TCP, stato HTTP, unit systemd, OID SNMP) e **dove**, anche su altri host della
   rete. I container Docker compaiono da soli.
 - **Risorse degli host** — CPU, RAM, dischi e temperature delle tue macchine, via SSH.
 - **WireGuard** — stato dei peer, letto da dove WireGuard gira davvero, router compreso.

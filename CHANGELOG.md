@@ -12,6 +12,32 @@ Versioning: [Semantic Versioning](https://semver.org/spec/v2.0.0.html)
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-10-12
+
+Feature release: SNMP becomes a full source for switches, access points, printers and NAS.
+
+### Added
+- **SNMP device details**: system description, uptime, location and contact, and a table
+  of interfaces with speed, live bandwidth, IPs, MAC and error counters, in the device card.
+- **Per-interface bandwidth history** (1h / 24h / 7d), opened from the device card. 64-bit
+  counters are used when the agent has them; a device reboot leaves a gap, never a zero.
+- **Topology on the map**: with LLDP and the switch FDB table, each device is attached to
+  the switch or access point port it is plugged into.
+- **`snmp` service method**: read an OID and check that it responds, equals, differs, is
+  greater or less than a number, or contains a text.
+- **Credential profiles** (v1, v2c, v3 with authNoPriv/authPriv) and per-host profile choice,
+  editable from Settings -> SNMP discovery. Community and passphrases are secrets, one entry
+  per profile, and never appear on a command line.
+- **Autodiscover**: live hosts in the scanned subnets are probed briefly with the default
+  profile.
+
+### Upgrade notes
+- SNMP stays **off** by default. Enable it from Settings -> SNMP discovery, set the secret of
+  each profile in Settings -> Secrets, then restart.
+- A community already written in `discovery.snmp.community` still works for the default
+  profile, with a warning in the log: move it to the secrets.
+- Prefer SNMPv3 with authPriv: v1 and v2c send the community in clear text.
+
 ## [1.2.1] - 2026-09-24
 
 Security release. None of these issues let someone in without logging in on the

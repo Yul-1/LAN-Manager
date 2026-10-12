@@ -6,8 +6,8 @@ Self-hosted dashboard to **manage, monitor and map your home or small-office LAN
 Runs in Docker, reachable **from your private network only**, and is meant to be
 configured from its own web UI rather than by editing files.
 
-> **Version 1.2.1** - security release: stricter terminal audit, network tools and
-> session handling. HTTPS for setups with your own nginx since 1.2.0.
+> **Version 1.3.0** - SNMP: device details, per-interface bandwidth with history,
+> switch-port topology on the map and an `snmp` service check.
 > See [CHANGELOG.md](CHANGELOG.md).
 
 ## What it does
@@ -19,11 +19,14 @@ configured from its own web UI rather than by editing files.
 - **Discovery** — DHCP leases and ARP from the router, plus a ping sweep, nmap,
   reverse DNS, SSH facts and SNMP. Each source is a pluggable provider and failures
   in one never take down the others.
+- **SNMP** — switches, access points, printers and NAS: interfaces with bandwidth and
+  history, LLDP neighbours and the switch port each device is plugged into. Credentials
+  are named profiles (v1/v2c/v3) whose secrets never appear on a command line.
 - **Interactive map** — the network drawn as a graph you can pan, zoom and rearrange.
 - **Traffic and WAN** — interface counters and throughput from an OpenWrt router,
   plus the state of the internet uplink (wired, 4G, tethering).
 - **Services** — for every service you choose **how** to monitor it (Docker
-  container, ping, TCP port, HTTP status, systemd unit) and **where**, including on
+  container, ping, TCP port, HTTP status, systemd unit, SNMP OID) and **where**, including on
   other hosts of the LAN. Docker containers show up on their own.
 - **Host resources** — CPU, RAM, disks and temperatures of your machines, over SSH.
 - **WireGuard** — peer status, read from wherever WireGuard actually runs, including
