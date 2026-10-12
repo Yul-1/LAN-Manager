@@ -874,3 +874,8 @@ td.err, .err { color: var(--red); }
 
 /* Chi ha chiesto meno animazioni non vede scorrere il drawer. */
 @media (prefers-reduced-motion: reduce) { .sidebar { transition: none; } }
+
+/* SNMP: modale del grafico per interfaccia e tabella interfacce nella scheda */
+.modal.modal-largo { width: min(820px, 94vw); }
+table.snmp-if { margin: 6px 0 4px; }
+table.snmp-if td, table.snmp-if th { white-space: nowrap; }

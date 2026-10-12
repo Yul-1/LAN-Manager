@@ -1436,6 +1436,8 @@ function renderDeviceList() {
     }).join("")}</tbody></table></div>`;
   box.querySelectorAll("[data-act]").forEach(b =>
     b.onclick = (e) => { e.preventDefault(); deviceAction(b.dataset.act, b.dataset.key); });
+  box.querySelectorAll("[data-snmp-if]").forEach(b =>
+    b.onclick = (e) => { e.preventDefault(); openIfaceChart(b.dataset.snmpHost, b.dataset.snmpIf); });
 }
 
 /* Scheda del dispositivo: compare sotto la riga, non al posto dell'elenco.
@@ -1464,17 +1466,22 @@ function deviceCard(d) {
       ${d.notes ? `<div class="kv" style="grid-column:1/-1"><span class="muted">${h(t("comune.note"))}</span><span>${h(d.notes)}</span></div>` : ""}
     </div>
     ${ifaceSection(d)}
+    ${snmpSection(d)}
   </div>`;
 }
 
 function ifaceSection(d) {
   const ifaces = d.interfaces || [];
+  // Un device SNMP ha le sue interfacce nella sezione SNMP qui sotto: dire
+  // "nessuna interfaccia rilevata" sopra sarebbe falso.
+  if (!ifaces.length && snmpHostDi(d)) return "";
   const titolo = `<div class="iface-testa">Interfacce di rete${
     ifaces.length ? ` <span class="muted">${ifaces.length} · da <code>ip -j addr show</code> via SSH</span>` : ""}</div>`;
   if (!ifaces.length)
     return `${titolo}<div class="muted" style="font-size:12px">Nessuna interfaccia rilevata:
-      si leggono via SSH, quindi ci sono solo per gli host configurati in
-      <span class="link" data-vai="settings" style="cursor:pointer">${h(t("impostazioni.vaiDiscovery"))}</span>.</div>`;
+      si leggono via SSH (host configurati in
+      <span class="link" data-vai="settings" style="cursor:pointer">${h(t("impostazioni.vaiDiscovery"))}</span>)
+      o via SNMP, per i device che lo espongono.</div>`;
   return `${titolo}<div class="iface-grid">${ifaces.map(ifaceCard).join("")}</div>`;
 }
 
@@ -1496,6 +1503,108 @@ function ifaceCard(i) {
     </div>
     <div class="iface-meta">${meta.join("")}</div>
   </div>`;
+}
+
+/* ── SNMP nella scheda del device ──────────────────────────────────
+   Il riassunto (sistema, profilo) arriva sul device dalla discovery; le
+   interfacce con la banda dallo snapshot `snmp`, che il poller aggiorna a
+   intervallo proprio. Un host che non risponde lo dice con il motivo, e le
+   velocita' non ancora calcolabili restano "—", mai uno zero. */
+function snmpHostDi(d) {
+  const hosts = (state.snap.snmp || {}).hosts || [];
+  return hosts.find(x => (d.ips || []).includes(x.ip)) || null;
+}
+
+function snmpSection(d) {
+  const sh = snmpHostDi(d);
+  if (!sh && !Object.keys(d.snmp || {}).length) return "";
+  const sys = sh && Object.keys(sh.system || {}).length ? sh.system : (d.snmp || {});
+  const row = (k, v) => v ? `<div class="kv"><span class="muted">${h(k)}</span><span class="mono">${v}</span></div>` : "";
+  const stato = !sh ? `<span class="chip ignoto">${h(t("snmp.inAttesa"))}</span>`
+    : sh.reachable ? `<span class="chip ok">${h(t("snmp.risponde"))}</span>`
+      : `<span class="chip ignoto">${h(t("snmp.nonRisponde"))}</span>`;
+  const quando = sh && sh.polled_at ? ` · ${h(t("snmp.letto", { q: ago(sh.polled_at) }))}` : "";
+  const uptime = sys.uptime_s != null ? durata(Math.floor(Date.now() / 1000) - sys.uptime_s) : "";
+  return `<div class="iface-testa">SNMP ${stato} <span class="muted">${h(t("snmp.profilo", { p: (sh && sh.profile) || sys.profile || "default" }))}${quando}</span> ${badgeSorgente("snmp")}</div>
+    ${sh && !sh.reachable && sh.error ? `<div class="cfg-note err">${h(sh.error)}</div>` : ""}
+    <div class="detail-grid">
+      ${row(t("snmp.descrizione"), h(sys.descr))}
+      ${row(t("snmp.uptime"), h(uptime))}
+      ${row(t("snmp.posizione"), h(sys.location))}
+      ${row(t("snmp.contatto"), h(sys.contact))}
+      ${row("sysObjectID", h(sys.object_id))}
+    </div>
+    ${sh ? snmpInterfacce(sh) : ""}
+    ${sh ? snmpVicini(sh) : ""}`;
+}
+
+function snmpInterfacce(sh) {
+  const tutte = sh.interfaces || [];
+  if (!tutte.length) return `<div class="muted" style="font-size:12px">${h(t("snmp.interfacceNonLette"))}</div>`;
+  const su = tutte.filter(i => i.oper === "up");
+  const giu = tutte.filter(i => i.oper !== "up");
+  const velocita = (i) => i.speed_mbps ? fmtRate(i.speed_mbps * 1e6) : "—";
+  const errori = (i) => (i.in_errors || 0) + (i.out_errors || 0);
+  return `<table class="snmp-if"><thead><tr><th>${h(t("snmp.interfaccia"))}</th><th>${h(t("comune.stato"))}</th>
+      <th>${h(t("snmp.velocita"))}</th><th>RX</th><th>TX</th><th>IP</th><th>MAC</th><th></th></tr></thead><tbody>${
+    su.map(i => `<tr>
+      <td class="mono">${h(i.name)}${i.alias ? `<div class="muted" style="font-size:11px">${h(i.alias)}</div>` : ""}</td>
+      <td><span class="chip ok">${h(i.oper)}</span>${errori(i) ? ` <span class="tag" title="${h(t("snmp.erroriTitolo"))}">${h(t("snmp.errori", { n: errori(i) }))}</span>` : ""}</td>
+      <td class="mono">${h(velocita(i))}</td>
+      <td class="mono">${h(fmtRate(i.rx_bps))}</td>
+      <td class="mono">${h(fmtRate(i.tx_bps))}</td>
+      <td class="mono">${(i.ips || []).map(h).join("<br>")}</td>
+      <td class="mono muted">${h(i.mac)}</td>
+      <td class="right"><button class="iconbtn" title="${h(t("snmp.storico"))}" data-snmp-host="${h(sh.ip)}" data-snmp-if="${h(i.name)}">∿</button></td>
+    </tr>`).join("")}</tbody></table>
+    ${giu.length ? `<div class="muted" style="font-size:12px">${h(t("snmp.nonAttive", { n: giu.length }))}:
+      <span class="mono">${giu.map(i => h(i.name)).join(", ")}</span></div>` : ""}`;
+}
+
+function snmpVicini(sh) {
+  const v = sh.lldp || [];
+  if (!v.length) return "";
+  return `<div class="iface-testa">${h(t("snmp.viciniLldp"))} <span class="muted">${v.length}</span></div>
+    <table><tbody>${v.map(n => `<tr>
+      <td class="mono">${h(n.local_port)}</td>
+      <td>${h(n.sys_name || n.chassis)}</td>
+      <td class="mono muted">${h(n.port_descr || n.port)}</td></tr>`).join("")}</tbody></table>`;
+}
+
+/* Grafico storico della banda di un'interfaccia SNMP. Sta in una modale e non
+   nella scheda: la scheda si ridisegna a ogni update del WebSocket e un canvas
+   li' dentro verrebbe ricreato ogni dieci secondi. */
+const ifaceChart = { periodo: "1h" };
+
+function openIfaceChart(host, ifname) {
+  const ov = document.createElement("div");
+  ov.className = "modal-ov";
+  ov.innerHTML = `<div class="modal modal-largo">
+    <h3><span class="mono">${h(ifname)}</span> <span class="muted mono">${h(host)}</span></h3>
+    <div class="controls"><select id="ifc-per">${["1h", "24h", "7d"].map(p =>
+      `<option value="${p}"${p === ifaceChart.periodo ? " selected" : ""}>${p}</option>`).join("")}</select>
+      <span id="ifc-msg" class="muted"></span></div>
+    <canvas class="chart tall" id="ifc-canvas"></canvas>
+    <div class="modal-actions"><button class="btn" id="ifc-close">${h(t("comune.chiudi"))}</button></div></div>`;
+  document.body.appendChild(ov);
+  const close = () => ov.remove();
+  ov.onclick = (e) => { if (e.target === ov) close(); };
+  $("#ifc-close", ov).onclick = close;
+  const carica = async () => {
+    const msg = $("#ifc-msg", ov);
+    msg.textContent = t("snmp.caricamento");
+    const q = new URLSearchParams({ host, ifname, period: ifaceChart.periodo });
+    const r = await api(`/api/history/interface?${q}`);
+    if (!r.ok) { msg.textContent = r.error.messaggio; return; }
+    const punti = r.data.points || [];
+    msg.textContent = punti.some(p => p.rx_bps != null || p.tx_bps != null)
+      ? "" : t("snmp.nessunDatoPeriodo");
+    drawLineChart($("#ifc-canvas", ov), punti, [
+      { get: p => p.rx_bps, color: "teal", label: "RX" },
+      { get: p => p.tx_bps, color: "green", label: "TX" }], { left: "rate" });
+  };
+  $("#ifc-per", ov).onchange = (e) => { ifaceChart.periodo = e.target.value; carica(); };
+  return carica();
 }
 
 /* Ultima transizione nota di device e servizi, dallo storico su disco.
@@ -1954,6 +2063,7 @@ async function serviceEdit(kind, ident) {
   } else {
     const e = (cfg.http || []).find(x => x.name === ident);
     if (e) ex = { method: e.type || "http", name: e.name, url: e.url, host: e.host, port: e.port, expect_status: e.expect_status,
+                  oid: e.oid, profile: e.profile, op: e.op, value: e.value,
                   dashboard: inDashboard("http", e) };
   }
   if (ex) openServiceModal(ex);
@@ -2018,6 +2128,14 @@ async function removeService(kind, ident) {
   await chiediRicalcoloServizi();
 }
 
+/* Condizioni del metodo snmp: stesso elenco del backend (SNMP_OPS). Le chiavi
+   sono scritte per intero: il controllo del catalogo le cerca nel sorgente. */
+const SNMP_OPS = ["responds", "eq", "ne", "gt", "lt", "contains"];
+const snmpOpLabel = (o) => ({
+  responds: t("snmp.op.responds"), eq: t("snmp.op.eq"), ne: t("snmp.op.ne"),
+  gt: t("snmp.op.gt"), lt: t("snmp.op.lt"), contains: t("snmp.op.contains"),
+})[o] || o;
+
 /* Modale servizio: aggiungi o (se `ex` passato) modifica. Il metodo scelto
    determina i campi; in modifica il metodo e' bloccato. */
 function openServiceModal(ex) {
@@ -2036,6 +2154,7 @@ function openServiceModal(ex) {
       <option value="http">HTTP (URL)</option>
       <option value="tcp">TCP (host:porta)</option>
       <option value="ping">ping (host raggiungibile)</option>
+      <option value="snmp">${h(t("snmp.metodoServizio"))}</option>
       <option value="docker">${h(t("servizi.dockerPin"))}</option>
     </select></label>
     <div id="sv-fields"></div>
@@ -2092,6 +2211,15 @@ function openServiceModal(ex) {
       <label>${h(t("comune.nome"))}<input type="text" id="sv-name" value="${h(ex.name || "")}"></label>
       <label>${h(t("comune.host"))}<input type="text" id="sv-host" value="${h(ex.host || "")}" placeholder="IP o hostname (anche di rete)"></label>
       ${dashField}`;
+    if (m === "snmp") return `
+      <label>${h(t("comune.nome"))}<input type="text" id="sv-name" value="${h(ex.name || "")}"></label>
+      <label>${h(t("comune.host"))}<input type="text" id="sv-host" value="${h(ex.host || "")}" placeholder="IP o hostname"></label>
+      <label>OID <span class="muted">${h(t("snmp.oidNota"))}</span><input type="text" id="sv-oid" class="mono" value="${h(ex.oid || "")}" placeholder="1.3.6.1.2.1.1.3.0"></label>
+      <label>${h(t("snmp.profiloCredenziali"))}<input type="text" id="sv-profile" value="${h(ex.profile || "")}" placeholder="default"></label>
+      <label>${h(t("snmp.condizione"))}<select id="sv-op">${SNMP_OPS.map(o =>
+        `<option value="${o}"${(ex.op || "responds") === o ? " selected" : ""}>${h(snmpOpLabel(o))}</option>`).join("")}</select></label>
+      <label>${h(t("snmp.valoreAtteso"))}<input type="text" id="sv-value" value="${h(ex.value || "")}" placeholder="${h(t("snmp.valoreNota"))}"></label>
+      ${dashField}`;
     return `
       <label>${h(t("servizi.nomeContainer"))}<input type="text" id="sv-name" value="${h(ex.name || "")}" placeholder="esatto come in docker ps"></label>
       <label>${h(t("comune.etichetta"))}<input type="text" id="sv-label" value="${h(ex.label || "")}"></label>
@@ -2115,6 +2243,11 @@ function openServiceModal(ex) {
     if (m === "http") { body.url = val("sv-url"); const ex = val("sv-expect"); if (ex) body.expect_status = ex.split(",").map(x => parseInt(x.trim())).filter(Number.isFinite); }
     if (m === "tcp") { body.host = val("sv-host"); body.port = parseInt(val("sv-port")) || 0; }
     if (m === "ping") { body.host = val("sv-host"); }
+    if (m === "snmp") {
+      body.host = val("sv-host"); body.oid = val("sv-oid"); body.op = $("#sv-op", ov).value;
+      const pr = val("sv-profile"); if (pr) body.profile = pr;
+      const v = val("sv-value"); if (v) body.value = v;
+    }
     const r = await api("/api/services/config", { method: "POST", body });
     if (r.ok) {
       close();
@@ -4144,6 +4277,8 @@ async function pageSettings(view) {
       <div id="ed-wg" class="muted">…</div>
       <h4 style="margin:16px 0 6px">${h(t("impostazioni.discoverySsh"))}</h4>
       <div id="ed-disc" class="muted">…</div>
+      <h4 style="margin:16px 0 6px">${h(t("snmp.discoveryTitolo"))}</h4>
+      <div id="ed-snmp" class="muted">…</div>
     </div>
     <div class="card" style="margin-bottom:14px">
       <h3>${h(t("impostazioni.alertSilenziati"))} <span class="right muted">${h(t("impostazioni.nessunRiavvio"))}</span></h3>
@@ -4393,6 +4528,83 @@ async function pageSettings(view) {
     render();
   }
 
+  async function loadSnmp() {
+    const box = $("#ed-snmp"); if (!box) return;
+    const r = await api("/api/config/section/discovery_snmp");
+    if (!r.ok) { box.innerHTML = noteErrore(r.error); return; }
+    const d = r.data.value || {};
+    d.profiles = Array.isArray(d.profiles) ? d.profiles : [];
+    // Gli host arrivano come IP nudi o come {ip, profile}: qui sempre oggetti.
+    d.hosts = (Array.isArray(d.hosts) ? d.hosts : []).map(x => typeof x === "string" ? { ip: x } : x);
+    const sel = (cls, i, k, valori, attuale) => `<select class="${cls}" data-i="${i}" data-k="${k}">${
+      valori.map(v => `<option value="${h(v)}"${String(attuale) === v ? " selected" : ""}>${h(v)}</option>`).join("")}</select>`;
+    const ck = (id, val, testo) => `<label class="muted" style="display:flex;gap:8px;align-items:center"><input type="checkbox" id="${id}" ${val ? "checked" : ""}> ${h(testo)}</label>`;
+    const render = () => {
+      const nomi = ["default", ...d.profiles.map(p => p.name).filter(n => n && n !== "default")];
+      box.innerHTML = `
+        ${ck("snmp-en", d.enabled, t("snmp.abilitata"))}
+        ${ck("snmp-auto", d.autodiscover !== false, t("snmp.autodiscover"))}
+        ${ck("snmp-traffic", d.traffic !== false, t("snmp.traffico"))}
+        ${ck("snmp-topo", d.topology !== false, t("snmp.topologia"))}
+        <div class="controls" style="margin:8px 0">
+          <label class="muted">${h(t("snmp.intervallo"))} <input id="snmp-int" type="number" min="5" value="${h(d.traffic_interval || 30)}" style="width:80px"></label>
+          <input id="snmp-excl" class="mono" placeholder="${h(t("snmp.esclusi"))}" value="${h((d.exclude || []).join(", "))}" style="min-width:220px"></div>
+        <div class="muted" style="font-size:12px;margin:6px 0">${h(t("snmp.profiliNota"))}</div>
+        <table><thead><tr><th>${h(t("comune.nome"))}</th><th>${h(t("snmp.versione"))}</th><th>${h(t("comune.utente"))}</th>
+          <th>${h(t("snmp.livello"))}</th><th>auth</th><th>priv</th><th></th></tr></thead><tbody>${
+          d.profiles.map((p, i) => `<tr>
+            <td><input class="snp-in mono" data-i="${i}" data-k="name" value="${h(p.name || "")}" style="width:110px"></td>
+            <td>${sel("snp-in", i, "version", ["1", "2c", "3"], p.version || "2c")}</td>
+            <td><input class="snp-in" data-i="${i}" data-k="user" value="${h(p.user || "")}" placeholder="(v3)" style="width:100px"></td>
+            <td>${sel("snp-in", i, "level", ["noAuthNoPriv", "authNoPriv", "authPriv"], p.level || "authPriv")}</td>
+            <td>${sel("snp-in", i, "auth_protocol", ["MD5", "SHA", "SHA-224", "SHA-256", "SHA-384", "SHA-512"], p.auth_protocol || "SHA")}</td>
+            <td>${sel("snp-in", i, "priv_protocol", ["DES", "AES", "AES-192", "AES-256"], p.priv_protocol || "AES")}</td>
+            <td class="right"><button class="iconbtn" data-delp="${i}">✕</button></td></tr>`).join("")
+        }</tbody></table>
+        <table style="margin-top:8px"><thead><tr><th>${h(t("impostazioni.hostIp"))}</th><th>${h(t("snmp.profiloCredenziali"))}</th><th></th></tr></thead><tbody>${
+          d.hosts.map((x, i) => `<tr>
+            <td><input class="snh-in mono" data-i="${i}" data-k="ip" value="${h(x.ip || "")}"></td>
+            <td>${sel("snh-in", i, "profile", nomi, x.profile || "default")}</td>
+            <td class="right"><button class="iconbtn" data-delh="${i}">✕</button></td></tr>`).join("")
+        }</tbody></table>
+        <div class="controls" style="margin-top:8px;margin-bottom:0"><button class="btn" id="snmp-addp">+ ${h(t("snmp.profilo1"))}</button>
+          <button class="btn" id="snmp-addh">+ host</button>
+          <button class="btn" id="snmp-save" style="border-color:var(--teal);color:var(--teal)">${h(t("snmp.salva"))}</button><span id="snmp-msg" class="muted"></span></div>`;
+      const lega = (cls, lista) => box.querySelectorAll("." + cls).forEach(inp => {
+        const aggiorna = () => { lista[inp.dataset.i][inp.dataset.k] = inp.value; };
+        inp.oninput = aggiorna; inp.onchange = aggiorna;
+      });
+      lega("snp-in", d.profiles); lega("snh-in", d.hosts);
+      // Il nome di un profilo cambia l'elenco dei profili degli host: si ridisegna
+      // all'uscita dal campo, non a ogni tasto (si perderebbe il fuoco).
+      box.querySelectorAll('.snp-in[data-k="name"]').forEach(inp => inp.onblur = render);
+      box.querySelectorAll("[data-delp]").forEach(b => b.onclick = () => { d.profiles.splice(+b.dataset.delp, 1); render(); });
+      box.querySelectorAll("[data-delh]").forEach(b => b.onclick = () => { d.hosts.splice(+b.dataset.delh, 1); render(); });
+      $("#snmp-addp", box).onclick = () => { d.profiles.push({ name: "", version: "3", level: "authPriv" }); render(); };
+      $("#snmp-addh", box).onclick = () => { d.hosts.push({ ip: "", profile: "default" }); render(); };
+      $("#snmp-save", box).onclick = () => {
+        const valore = { ...d,
+          enabled: $("#snmp-en", box).checked,
+          autodiscover: $("#snmp-auto", box).checked,
+          traffic: $("#snmp-traffic", box).checked,
+          topology: $("#snmp-topo", box).checked,
+          traffic_interval: parseInt($("#snmp-int", box).value, 10) || 30,
+          exclude: $("#snmp-excl", box).value.split(",").map(x => x.trim()).filter(Boolean),
+          profiles: d.profiles.filter(p => (p.name || "").trim()).map(p => {
+            const o = { ...p, name: p.name.trim() };
+            // I campi v3 su un profilo v1/v2c non servono: il file resta leggibile.
+            if (o.version !== "3") ["user", "level", "auth_protocol", "priv_protocol"].forEach(k => delete o[k]);
+            return o;
+          }),
+          hosts: d.hosts.filter(x => (x.ip || "").trim()).map(x =>
+            (x.profile || "default") === "default" ? x.ip.trim() : { ip: x.ip.trim(), profile: x.profile }),
+        };
+        saveSection("discovery_snmp", valore, (m, c) => rowMsg("snmp-msg", m, c));
+      };
+    };
+    render();
+  }
+
   async function loadSilenced() {
     const box = $("#ed-alerts"); if (!box) return;
     const [rregole, rsilenced] = await Promise.all([
@@ -4431,7 +4643,7 @@ async function pageSettings(view) {
 
   editorTemi();
   editorLingua();
-  load(); loadBackups(); loadSecrets(); loadSubnets(); loadWg(); loadDisc(); loadSilenced();
+  load(); loadBackups(); loadSecrets(); loadSubnets(); loadWg(); loadDisc(); loadSnmp(); loadSilenced();
   caricaRiavvio();
 }
 
@@ -5123,6 +5335,17 @@ function syncMapNodes(devices) {
       map.nodes.set(id, nd);
     }
     Object.assign(nd, { name: d.name, type: d.type, subnet: d.subnet, online: d.online, ips: d.ips, key: d.key, parent });
+    // La porta la rimette solo il passo della topologia qui sotto.
+    delete nd.port;
+  });
+  // Topologia SNMP (LLDP/FDB): un device di cui si sa su quale porta di quale
+  // switch/AP sta si aggancia a quello invece che all'hub della subnet. Solo se
+  // lo switch e' fra i nodi disegnati: nascosto o filtrato, si resta sull'hub.
+  (state.snap.topology || []).forEach(l => {
+    const nd = map.nodes.get(l.device);
+    if (nd && seen.has(l.device) && seen.has(l.via) && l.via !== l.device) {
+      nd.parent = l.via; nd.port = l.port;
+    }
   });
   // rimuovi nodi spariti
   for (const id of [...map.nodes.keys()]) if (!seen.has(id)) map.nodes.delete(id);
@@ -5167,7 +5390,9 @@ function buildMapDom() {
       : (n.online === false ? pal.faint : pal.muted));
     lbl.setAttribute("font-family", "ui-monospace, monospace");
     lbl.textContent = (n.name || "").slice(0, 16);
-    g.append(c, glifo, lbl); n.el = g; n.dot = c;
+    const tip = document.createElementNS(SVGNS, "title");
+    tip.textContent = n.port ? `${n.name || ""} · ${t("snmp.portaMappa", { p: n.port })}` : (n.name || "");
+    g.append(c, glifo, lbl, tip); n.el = g; n.dot = c;
     svg.appendChild(g);
   });
 }
